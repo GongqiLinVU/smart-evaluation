@@ -1,0 +1,34 @@
+30 points
+Provides a clear, comprehensive, and insightful explanation of the logic behind each main function, demonstrating in-depth understanding.
+
+The methodology is explained in a highly structured, clear, and concise manner, with strong justification for choices made.
+
+Detailed and precise implementation steps are provided, showing a complete understanding of how each main function was implemented.
+
+24 points
+Thorough explanation of logic with good clarity, showing solid understanding of each function’s purpose and structure.
+
+Clear explanation of the methodology with appropriate reasoning for most decisions made.
+
+Clear and mostly detailed description of implementation steps, demonstrating a solid understanding of the function implementation.
+
+18 points
+Sufficient explanation of the logic for each function, with some minor gaps or lack of detail.
+
+Methodology is described but lacks clarity or depth in some areas; reasoning is partially justified.
+
+Adequate explanation of implementation, but with some minor gaps or lack of technical detail.
+
+12 points
+Basic explanation of the logic, with limited depth, but overall understanding is evident.
+
+Basic methodology is described, but there is little justification or reflection on choices made.
+
+Basic implementation steps are mentioned but lack clarity or thoroughness.
+
+6 points
+Fails to explain the logic or presents a disorganized, unclear understanding of how the main functions work.
+
+No clear explanation of methodology, or the methodology provided is inadequate or poorly justified.
+
+The implementation is poorly explained, with little to no detail on how the functions were implemented.

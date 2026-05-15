@@ -1,0 +1,49 @@
+{
+  "name": "IT Capstone Final Report Rubric",
+  "totalPoints": 30,
+  "levels": [
+    { "name": "EXCELLENT", "points": 30, "minRawScore": 85 },
+    { "name": "PROFICIENT", "points": 24, "minRawScore": 65 },
+    { "name": "COMPETENT", "points": 18, "minRawScore": 45 },
+    { "name": "DEVELOPING", "points": 12, "minRawScore": 25 },
+    { "name": "INADEQUATE", "points": 6, "minRawScore": 0 }
+  ],
+  "criteria": [
+    {
+      "name": "logic_explanation",
+      "displayName": "Logic Explanation",
+      "description": "How well does the student explain the logic behind each main function, demonstrating understanding?",
+      "levels": {
+        "EXCELLENT": "Provides a clear, comprehensive, and insightful explanation of the logic behind each main function, demonstrating in-depth understanding.",
+        "PROFICIENT": "Thorough explanation of logic with good clarity, showing solid understanding of each function's purpose and structure.",
+        "COMPETENT": "Sufficient explanation of the logic for each function, with some minor gaps or lack of detail.",
+        "DEVELOPING": "Basic explanation of the logic, with limited depth, but overall understanding is evident.",
+        "INADEQUATE": "Fails to explain the logic or presents a disorganized, unclear understanding of how the main functions work."
+      }
+    },
+    {
+      "name": "methodology",
+      "displayName": "Methodology",
+      "description": "How structured, clear, and justified is the methodology explanation?",
+      "levels": {
+        "EXCELLENT": "The methodology is explained in a highly structured, clear, and concise manner, with strong justification for choices made.",
+        "PROFICIENT": "Clear explanation of the methodology with appropriate reasoning for most decisions made.",
+        "COMPETENT": "Methodology is described but lacks clarity or depth in some areas; reasoning is partially justified.",
+        "DEVELOPING": "Basic methodology is described, but there is little justification or reflection on choices made.",
+        "INADEQUATE": "No clear explanation of methodology, or the methodology provided is inadequate or poorly justified."
+      }
+    },
+    {
+      "name": "implementation_detail",
+      "displayName": "Implementation Detail",
+      "description": "How precise and complete are the implementation step descriptions?",
+      "levels": {
+        "EXCELLENT": "Detailed and precise implementation steps are provided, showing a complete understanding of how each main function was implemented.",
+        "PROFICIENT": "Clear and mostly detailed description of implementation steps, demonstrating a solid understanding of the function implementation.",
+        "COMPETENT": "Adequate explanation of implementation, but with some minor gaps or lack of technical detail.",
+        "DEVELOPING": "Basic implementation steps are mentioned but lack clarity or thoroughness.",
+        "INADEQUATE": "The implementation is poorly explained, with little to no detail on how the functions were implemented."
+      }
+    }
+  ]
+}

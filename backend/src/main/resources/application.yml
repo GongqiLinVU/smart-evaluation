@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: capstone-eval
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  datasource:
+    url: jdbc:mysql://localhost:3306/capstone_eval?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+server:
+  port: 8080
+
+eval:
+  jwt:
+    secret: ${EVAL_JWT_SECRET:capstone-eval-default-secret-key-change-in-production-32chars}
+    expiration-ms: ${EVAL_JWT_EXPIRATION:86400000}
+  storage:
+    upload-dir: ./uploads
+  llm:
+    enabled: ${EVAL_LLM_ENABLED:false}
+    provider: ${EVAL_LLM_PROVIDER:deepseek}
+    deepseek:
+      api-key: ${EVAL_LLM_DEEPSEEK_API_KEY:}
+      base-url: https://api.deepseek.com/v1
+      model: deepseek-chat
+    openai:
+      api-key: ${EVAL_LLM_OPENAI_API_KEY:}
+      base-url: https://api.openai.com/v1
+      model: gpt-4o
+    anthropic:
+      api-key: ${EVAL_LLM_ANTHROPIC_API_KEY:}
+      base-url: https://api.anthropic.com/v1
+      model: claude-sonnet-4-20250514
+    gemini:
+      api-key: ${EVAL_LLM_GEMINI_API_KEY:}
+      base-url: https://generativelanguage.googleapis.com/v1beta
+      model: gemini-2.0-flash
