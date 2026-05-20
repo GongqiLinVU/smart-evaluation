@@ -25,6 +25,9 @@ Thumbs.db
 # === Uploads & runtime ===
 uploads/
 *.log
+.pids/
+backend.log
+frontend.log
 
 # === Secrets ===
 .env
