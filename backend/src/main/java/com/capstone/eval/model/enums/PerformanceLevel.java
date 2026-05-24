@@ -24,4 +24,15 @@ public enum PerformanceLevel {
         if (rawScore >= 25) return DEVELOPING;
         return INADEQUATE;
     }
+
+    public static PerformanceLevel fromPoints(int points) {
+        for (PerformanceLevel level : values()) {
+            if (level.points == points) return level;
+        }
+        if (points >= 27) return EXCELLENT;
+        if (points >= 21) return PROFICIENT;
+        if (points >= 15) return COMPETENT;
+        if (points >= 9) return DEVELOPING;
+        return INADEQUATE;
+    }
 }

@@ -6,6 +6,7 @@ public record CreateProjectRequest(
         @NotBlank String name,
         @NotBlank String academicYear,
         @NotBlank String semester,
-        String description
+        String description,
+        Long rulePackageId
 ) {
 }

@@ -31,6 +31,7 @@ eval:
   llm:
     enabled: ${EVAL_LLM_ENABLED:false}
     provider: ${EVAL_LLM_PROVIDER:deepseek}
+    max-runs-per-submission: ${EVAL_LLM_MAX_RUNS:3}
     deepseek:
       api-key: ${EVAL_LLM_DEEPSEEK_API_KEY:}
       base-url: https://api.deepseek.com/v1

@@ -31,13 +31,23 @@ export interface SubmissionResponse {
   taskName: string | null;
 }
 
+export interface EvidenceItem {
+  sectionName?: string;
+  sectionIndex?: number;
+  quote: string;
+  sentiment?: 'positive' | 'negative';
+  note?: string;
+}
+
 export interface CriterionScoreResponse {
   criterionName: string;
   score: number;
   level: string;
   justification: string;
-  evidence: string[];
+  evidence: (string | EvidenceItem)[];
   subScores: Record<string, { score: number; max: number; note: string }>;
+  confidence: number | null;
+  suggestions: string[] | null;
 }
 
 export interface EvaluationResultResponse {
@@ -50,6 +60,7 @@ export interface EvaluationResultResponse {
   strengths: string[];
   improvements: string[];
   confidence: number | null;
+  rawLlmResponse: string | null;
   evaluatedAt: string;
   criteria: CriterionScoreResponse[];
 }
@@ -75,6 +86,7 @@ export interface HealthResponse {
   status: string;
   llmEnabled: boolean;
   llmProvider: string;
+  maxLlmRunsPerSubmission: number;
 }
 
 export interface StudentFeedbackResponse {
@@ -94,6 +106,8 @@ export interface ProjectResponse {
   description: string | null;
   createdAt: string;
   memberCount: number;
+  rulePackageId: number | null;
+  rulePackageName: string | null;
 }
 
 export interface ProjectMemberResponse {
@@ -111,6 +125,8 @@ export interface ProjectTaskResponse {
   name: string;
   description: string | null;
   displayOrder: number;
+  rulePackageId: number | null;
+  rulePackageName: string | null;
   createdAt: string;
 }
 
@@ -122,4 +138,107 @@ export interface ScoreAdjustmentResponse {
   adjustedScore: number;
   reason: string;
   adjustedAt: string;
+}
+
+export interface TutorReviewDimensionResponse {
+  id: number;
+  dimensionName: string;
+  score: number;
+  maxScore: number;
+  justification: string;
+}
+
+export interface TutorReviewResponse {
+  id: number;
+  submissionId: number;
+  tutorName: string;
+  overallScore: number;
+  overallComment: string;
+  reviewedAt: string;
+  dimensions: TutorReviewDimensionResponse[];
+}
+
+export interface ScoringWeightsResponse {
+  ruleBasedWeight: number;
+  llmWeight: number;
+  tutorWeight: number;
+  maxScore: number;
+}
+
+export interface ComponentScore {
+  method: string;
+  rawScore: number | null;
+  rawMaxScore: number;
+  percentage: number | null;
+  weight: number;
+  weightedContribution: number | null;
+  available: boolean;
+}
+
+export interface CompositeScoreResponse {
+  compositeScore: number | null;
+  compositePercentage: number | null;
+  maxScore: number;
+  level: string | null;
+  components: ComponentScore[];
+  weights: ScoringWeightsResponse;
+}
+
+export interface RuleResponse {
+  id: number;
+  ruleKey: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  llmCriterionPrompt: string | null;
+  builtIn: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RulePackageItemResponse {
+  id: number;
+  ruleId: number;
+  ruleKey: string;
+  ruleName: string;
+  ruleCategory: string | null;
+  enabled: boolean;
+  weight: number;
+}
+
+export interface RulePackageResponse {
+  id: number;
+  name: string;
+  description: string | null;
+  isDefault: boolean;
+  logicEnabled: boolean;
+  methodologyEnabled: boolean;
+  implementationEnabled: boolean;
+  logicWeight: number;
+  methodologyWeight: number;
+  implementationWeight: number;
+  items: RulePackageItemResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LlmConfigResponse {
+  id: number;
+  name: string;
+  systemPromptTemplate: string | null;
+  additionalContext: string | null;
+  outputFormatTemplate: string | null;
+  temperature: number | null;
+  maxTokens: number | null;
+  provider: string | null;
+  model: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromptPreviewResponse {
+  systemPrompt: string;
+  estimatedTokens: number;
+  criteriaIncluded: string[];
 }

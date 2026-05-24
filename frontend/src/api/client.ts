@@ -11,6 +11,13 @@ import type {
   ProjectResponse,
   ProjectMemberResponse,
   ProjectTaskResponse,
+  TutorReviewResponse,
+  ScoringWeightsResponse,
+  CompositeScoreResponse,
+  RulePackageResponse,
+  RuleResponse,
+  LlmConfigResponse,
+  PromptPreviewResponse,
 } from '../types';
 
 const api = axios.create({
@@ -281,6 +288,7 @@ export async function createProject(req: {
   academicYear: string;
   semester: string;
   description?: string;
+  rulePackageId?: number;
 }): Promise<ProjectResponse> {
   const { data } = await api.post<ProjectResponse>('/projects', req);
   return data;
@@ -293,6 +301,7 @@ export async function updateProject(
     academicYear: string;
     semester: string;
     description?: string;
+    rulePackageId?: number;
   },
 ): Promise<ProjectResponse> {
   const { data } = await api.put<ProjectResponse>(`/projects/${id}`, req);
@@ -354,7 +363,7 @@ export async function listProjectTasks(
 
 export async function createProjectTask(
   projectId: number,
-  req: { name: string; description?: string; displayOrder?: number },
+  req: { name: string; description?: string; displayOrder?: number; rulePackageId?: number },
 ): Promise<ProjectTaskResponse> {
   const { data } = await api.post<ProjectTaskResponse>(
     `/projects/${projectId}/tasks`,
@@ -366,7 +375,7 @@ export async function createProjectTask(
 export async function updateProjectTask(
   projectId: number,
   taskId: number,
-  req: { name: string; description?: string; displayOrder?: number },
+  req: { name: string; description?: string; displayOrder?: number; rulePackageId?: number },
 ): Promise<ProjectTaskResponse> {
   const { data } = await api.put<ProjectTaskResponse>(
     `/projects/${projectId}/tasks/${taskId}`,
@@ -380,6 +389,237 @@ export async function deleteProjectTask(
   taskId: number,
 ): Promise<void> {
   await api.delete(`/projects/${projectId}/tasks/${taskId}`);
+}
+
+// Tutor Reviews
+export async function saveTutorReview(
+  submissionId: number,
+  req: {
+    overallScore: number;
+    overallComment?: string;
+    dimensions: {
+      dimensionName: string;
+      score: number;
+      maxScore: number;
+      justification?: string;
+    }[];
+  },
+): Promise<TutorReviewResponse> {
+  const { data } = await api.post<TutorReviewResponse>(
+    `/submissions/${submissionId}/tutor-reviews`,
+    req,
+  );
+  return data;
+}
+
+export async function getTutorReview(
+  submissionId: number,
+): Promise<TutorReviewResponse | null> {
+  const { data } = await api.get<TutorReviewResponse | null>(
+    `/submissions/${submissionId}/tutor-reviews`,
+  );
+  return data;
+}
+
+export async function addTutorReviewDimension(
+  submissionId: number,
+  dimension: {
+    dimensionName: string;
+    score: number;
+    maxScore: number;
+    justification?: string;
+  },
+): Promise<TutorReviewResponse> {
+  const { data } = await api.post<TutorReviewResponse>(
+    `/submissions/${submissionId}/tutor-reviews/dimensions`,
+    dimension,
+  );
+  return data;
+}
+
+export async function removeTutorReviewDimension(
+  submissionId: number,
+  dimensionId: number,
+): Promise<TutorReviewResponse> {
+  const { data } = await api.delete<TutorReviewResponse>(
+    `/submissions/${submissionId}/tutor-reviews/dimensions/${dimensionId}`,
+  );
+  return data;
+}
+
+// Scoring Config
+export async function getScoringWeights(): Promise<ScoringWeightsResponse> {
+  const { data } = await api.get<ScoringWeightsResponse>('/scoring/weights');
+  return data;
+}
+
+export async function updateScoringWeights(req: {
+  ruleBasedWeight: number;
+  llmWeight: number;
+  tutorWeight: number;
+  maxScore?: number;
+}): Promise<ScoringWeightsResponse> {
+  const { data } = await api.put<ScoringWeightsResponse>('/scoring/weights', req);
+  return data;
+}
+
+export async function getCompositeScore(
+  submissionId: number,
+): Promise<CompositeScoreResponse> {
+  const { data } = await api.get<CompositeScoreResponse>(
+    `/scoring/composite/${submissionId}`,
+  );
+  return data;
+}
+
+// Rules
+export async function listRules(): Promise<RuleResponse[]> {
+  const { data } = await api.get<RuleResponse[]>('/rules');
+  return data;
+}
+
+export async function getRule(id: number): Promise<RuleResponse> {
+  const { data } = await api.get<RuleResponse>(`/rules/${id}`);
+  return data;
+}
+
+export async function createRule(req: {
+  ruleKey: string;
+  name: string;
+  description?: string;
+  category?: string;
+  llmCriterionPrompt?: string;
+}): Promise<RuleResponse> {
+  const { data } = await api.post<RuleResponse>('/rules', req);
+  return data;
+}
+
+export async function updateRule(
+  id: number,
+  req: {
+    ruleKey: string;
+    name: string;
+    description?: string;
+    category?: string;
+    llmCriterionPrompt?: string;
+  },
+): Promise<RuleResponse> {
+  const { data } = await api.put<RuleResponse>(`/rules/${id}`, req);
+  return data;
+}
+
+export async function deleteRule(id: number): Promise<void> {
+  await api.delete(`/rules/${id}`);
+}
+
+// Rule Packages
+export async function listRulePackages(): Promise<RulePackageResponse[]> {
+  const { data } = await api.get<RulePackageResponse[]>('/rule-packages');
+  return data;
+}
+
+export async function getRulePackage(id: number): Promise<RulePackageResponse> {
+  const { data } = await api.get<RulePackageResponse>(`/rule-packages/${id}`);
+  return data;
+}
+
+export async function createRulePackage(req: {
+  name: string;
+  description?: string;
+  logicEnabled: boolean;
+  methodologyEnabled: boolean;
+  implementationEnabled: boolean;
+  logicWeight: number;
+  methodologyWeight: number;
+  implementationWeight: number;
+  isDefault?: boolean;
+  items?: { ruleId: number; enabled: boolean; weight: number }[];
+}): Promise<RulePackageResponse> {
+  const { data } = await api.post<RulePackageResponse>('/rule-packages', req);
+  return data;
+}
+
+export async function updateRulePackage(
+  id: number,
+  req: {
+    name: string;
+    description?: string;
+    logicEnabled: boolean;
+    methodologyEnabled: boolean;
+    implementationEnabled: boolean;
+    logicWeight: number;
+    methodologyWeight: number;
+    implementationWeight: number;
+    isDefault?: boolean;
+    items?: { ruleId: number; enabled: boolean; weight: number }[];
+  },
+): Promise<RulePackageResponse> {
+  const { data } = await api.put<RulePackageResponse>(`/rule-packages/${id}`, req);
+  return data;
+}
+
+export async function deleteRulePackage(id: number): Promise<void> {
+  await api.delete(`/rule-packages/${id}`);
+}
+
+// LLM Config
+export async function listLlmConfigs(): Promise<LlmConfigResponse[]> {
+  const { data } = await api.get<LlmConfigResponse[]>('/llm-config');
+  return data;
+}
+
+export async function getLlmConfig(id: number): Promise<LlmConfigResponse> {
+  const { data } = await api.get<LlmConfigResponse>(`/llm-config/${id}`);
+  return data;
+}
+
+export async function createLlmConfig(req: {
+  name: string;
+  systemPromptTemplate?: string;
+  additionalContext?: string;
+  outputFormatTemplate?: string;
+  temperature?: number;
+  maxTokens?: number;
+  provider?: string;
+  model?: string;
+  isDefault?: boolean;
+}): Promise<LlmConfigResponse> {
+  const { data } = await api.post<LlmConfigResponse>('/llm-config', req);
+  return data;
+}
+
+export async function updateLlmConfig(
+  id: number,
+  req: {
+    name: string;
+    systemPromptTemplate?: string;
+    additionalContext?: string;
+    outputFormatTemplate?: string;
+    temperature?: number;
+    maxTokens?: number;
+    provider?: string;
+    model?: string;
+    isDefault?: boolean;
+  },
+): Promise<LlmConfigResponse> {
+  const { data } = await api.put<LlmConfigResponse>(`/llm-config/${id}`, req);
+  return data;
+}
+
+export async function deleteLlmConfig(id: number): Promise<void> {
+  await api.delete(`/llm-config/${id}`);
+}
+
+export async function previewLlmPrompt(
+  configId: number,
+  rulePackageId: number,
+): Promise<PromptPreviewResponse> {
+  const { data } = await api.post<PromptPreviewResponse>(
+    `/llm-config/${configId}/preview`,
+    null,
+    { params: { rulePackageId } },
+  );
+  return data;
 }
 
 export default api;

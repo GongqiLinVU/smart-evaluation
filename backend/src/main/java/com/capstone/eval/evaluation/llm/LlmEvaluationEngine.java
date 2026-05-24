@@ -1,22 +1,23 @@
 package com.capstone.eval.evaluation.llm;
 
 import com.capstone.eval.evaluation.EvaluationEngine;
+import com.capstone.eval.evaluation.llm.multiround.*;
 import com.capstone.eval.exception.EvaluationException;
-import com.capstone.eval.model.EvaluationResult;
-import com.capstone.eval.model.Submission;
+import com.capstone.eval.model.*;
 import com.capstone.eval.model.enums.EvaluationMethod;
 import com.capstone.eval.parser.ParsedDocument;
+import com.capstone.eval.repository.LlmConfigRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
-/**
- * LLM-based evaluation engine that sends the parsed document to a large language model
- * for assessment. Implements the same {@link EvaluationEngine} interface as the rule-based
- * engine, allowing them to be used interchangeably.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -25,54 +26,186 @@ public class LlmEvaluationEngine implements EvaluationEngine {
     private final LlmProviderFactory providerFactory;
     private final PromptBuilder promptBuilder;
     private final LlmResponseParser responseParser;
+    private final EvaluationRoundPlanner roundPlanner;
+    private final DynamicPromptBuilder dynamicPromptBuilder;
+    private final RoundExecutor roundExecutor;
+    private final SynthesisAggregator synthesisAggregator;
+    private final LlmConfigRepository llmConfigRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     public EvaluationResult evaluate(ParsedDocument document, Submission submission) {
-        log.info("Starting LLM-based evaluation for submission id={}", submission.getId());
+        return evaluate(document, submission, null);
+    }
 
-        // 1. Get the default provider and verify it is configured
+    public EvaluationResult evaluate(ParsedDocument document, Submission submission, RulePackage rulePackage) {
+        log.info("Starting LLM evaluation for submission id={}", submission.getId());
+
         LlmProvider provider = providerFactory.getDefaultProvider();
         if (!provider.isConfigured()) {
             throw new EvaluationException(
-                    "LLM provider '" + provider.getName() + "' is not configured. "
-                            + "Please set the API key in application configuration.");
+                    "LLM provider '" + provider.getName() + "' is not configured.");
         }
 
-        // 2. Build the prompts
-        String systemPrompt = promptBuilder.buildSystemPrompt();
-        String userPrompt = promptBuilder.buildUserPrompt(document);
+        LlmConfig config = llmConfigRepository.findByIsDefaultTrue().orElse(null);
 
-        List<LlmMessage> messages = List.of(
-                LlmMessage.system(systemPrompt),
-                LlmMessage.user(userPrompt)
-        );
+        List<RulePackageItem> enabledRules = resolveEnabledRules(rulePackage);
 
-        // 3. Call the LLM
-        LlmOptions options = LlmOptions.defaults(null); // use provider's default model
-        log.info("Sending evaluation request to provider '{}' (system prompt: {} chars, user prompt: {} chars)",
-                provider.getName(), systemPrompt.length(), userPrompt.length());
-
-        LlmResponse llmResponse;
-        try {
-            llmResponse = provider.chat(messages, options);
-        } catch (Exception e) {
-            log.error("LLM API call failed for submission id={}", submission.getId(), e);
-            throw new EvaluationException("LLM evaluation failed: " + e.getMessage(), e);
+        if (enabledRules.isEmpty()) {
+            log.warn("No enabled rules found, falling back to legacy single-pass");
+            return legacyEvaluate(document, submission);
         }
 
-        log.info("LLM response received for submission id={}: {} chars, prompt_tokens={}, completion_tokens={}",
-                submission.getId(), llmResponse.content().length(),
-                llmResponse.promptTokens(), llmResponse.completionTokens());
+        EvaluationPlan plan = roundPlanner.planRounds(document, enabledRules);
+        log.info("Evaluation plan: strategy={}, rounds={}",
+                plan.strategy(), plan.evaluationRounds().size());
 
-        // 4. Parse the LLM response into an EvaluationResult
-        EvaluationResult result = responseParser.parse(llmResponse.content(), submission);
+        String systemPrompt = dynamicPromptBuilder.buildSystemPrompt(config, enabledRules);
 
-        // 5. Ensure method is set to LLM
+        EvaluationResult result;
+        if (plan.strategy() == PlanStrategy.SINGLE_PASS) {
+            result = executeSinglePass(plan, document, submission, config, enabledRules, systemPrompt);
+        } else {
+            result = executeMultiPass(plan, document, submission, config, enabledRules, systemPrompt);
+        }
+
         result.setMethod(EvaluationMethod.LLM);
 
         log.info("LLM evaluation complete for submission id={}: overall={}/30 ({})",
                 submission.getId(), result.getOverallScore(), result.getOverallLevel());
 
         return result;
+    }
+
+    private EvaluationResult executeSinglePass(
+            EvaluationPlan plan,
+            ParsedDocument document,
+            Submission submission,
+            LlmConfig config,
+            List<RulePackageItem> enabledRules,
+            String systemPrompt
+    ) {
+        RoundSpec roundSpec = plan.evaluationRounds().get(0);
+        LocalDateTime startedAt = LocalDateTime.now();
+
+        RoundOutput output = roundExecutor.executeEvaluationRound(
+                roundSpec, document, config, enabledRules, systemPrompt);
+
+        EvaluationResult result = synthesisAggregator.synthesizeSinglePass(
+                output, submission, enabledRules);
+
+        EvaluationRound round = buildRoundRecord(output, roundSpec, startedAt);
+        round.setEvaluationResult(result);
+        result.getRounds().add(round);
+
+        return result;
+    }
+
+    private EvaluationResult executeMultiPass(
+            EvaluationPlan plan,
+            ParsedDocument document,
+            Submission submission,
+            LlmConfig config,
+            List<RulePackageItem> enabledRules,
+            String systemPrompt
+    ) {
+        List<LocalDateTime> startTimes = new ArrayList<>();
+        List<CompletableFuture<RoundOutput>> futures = new ArrayList<>();
+
+        for (RoundSpec roundSpec : plan.evaluationRounds()) {
+            startTimes.add(LocalDateTime.now());
+            futures.add(CompletableFuture.supplyAsync(() ->
+                    roundExecutor.executeEvaluationRound(
+                            roundSpec, document, config, enabledRules, systemPrompt)));
+        }
+
+        List<RoundOutput> roundOutputs = futures.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
+
+        List<RoundOutput> successfulOutputs = roundOutputs.stream()
+                .filter(RoundOutput::success)
+                .toList();
+
+        if (successfulOutputs.isEmpty()) {
+            throw new EvaluationException("All evaluation rounds failed");
+        }
+
+        LocalDateTime synthesisStart = LocalDateTime.now();
+        RoundOutput synthesisOutput = null;
+        if (plan.synthesisRound() != null && successfulOutputs.size() > 1) {
+            synthesisOutput = roundExecutor.executeSynthesisRound(
+                    successfulOutputs, config, enabledRules, systemPrompt);
+        }
+
+        EvaluationResult result = synthesisAggregator.synthesize(
+                roundOutputs, synthesisOutput, submission, enabledRules, plan);
+
+        for (int i = 0; i < roundOutputs.size(); i++) {
+            RoundSpec spec = plan.evaluationRounds().get(i);
+            EvaluationRound round = buildRoundRecord(roundOutputs.get(i), spec, startTimes.get(i));
+            round.setEvaluationResult(result);
+            result.getRounds().add(round);
+        }
+
+        if (synthesisOutput != null) {
+            EvaluationRound synthRound = buildRoundRecord(
+                    synthesisOutput, plan.synthesisRound(), synthesisStart);
+            synthRound.setEvaluationResult(result);
+            result.getRounds().add(synthRound);
+        }
+
+        return result;
+    }
+
+    private EvaluationResult legacyEvaluate(ParsedDocument document, Submission submission) {
+        String systemPrompt = promptBuilder.buildSystemPrompt();
+        String userPrompt = promptBuilder.buildUserPrompt(document);
+
+        LlmProvider provider = providerFactory.getDefaultProvider();
+        LlmOptions options = LlmOptions.defaults(null);
+
+        List<LlmMessage> messages = List.of(
+                LlmMessage.system(systemPrompt),
+                LlmMessage.user(userPrompt)
+        );
+
+        LlmResponse llmResponse = provider.chat(messages, options);
+        EvaluationResult result = responseParser.parse(llmResponse.content(), submission);
+        result.setMethod(EvaluationMethod.LLM);
+        return result;
+    }
+
+    private List<RulePackageItem> resolveEnabledRules(RulePackage rulePackage) {
+        if (rulePackage == null || rulePackage.getItems() == null || rulePackage.getItems().isEmpty()) {
+            return List.of();
+        }
+        return rulePackage.getItems().stream()
+                .filter(item -> Boolean.TRUE.equals(item.getEnabled()))
+                .toList();
+    }
+
+    private EvaluationRound buildRoundRecord(RoundOutput output, RoundSpec spec, LocalDateTime startedAt) {
+        String inputSections = null;
+        String targetCriteria = null;
+        try {
+            inputSections = objectMapper.writeValueAsString(spec.sectionIndices());
+            targetCriteria = objectMapper.writeValueAsString(spec.criteriaKeys());
+        } catch (Exception e) {
+            log.warn("Failed to serialize round spec: {}", e.getMessage());
+        }
+
+        return EvaluationRound.builder()
+                .roundNumber(spec.roundNumber())
+                .roundType(spec.roundType())
+                .inputSections(inputSections)
+                .targetCriteria(targetCriteria)
+                .rawResponse(output.rawResponse())
+                .promptTokens(output.promptTokens())
+                .completionTokens(output.completionTokens())
+                .status(output.success() ? "SUCCESS" : "FAILED")
+                .startedAt(startedAt)
+                .completedAt(LocalDateTime.now())
+                .build();
     }
 }

@@ -40,6 +40,15 @@ public class EvaluationController {
                     + "'. Supported values: RULE_BASED, LLM");
         }
 
+        if (evaluationMethod == EvaluationMethod.LLM) {
+            int max = llmProviderConfig.getMaxLlmRunsPerSubmission();
+            long count = evaluationResultRepository.countBySubmissionIdAndMethod(submissionId, EvaluationMethod.LLM);
+            if (count >= max) {
+                throw new EvaluationException(
+                        "LLM evaluation limit reached (" + max + " runs per submission).");
+            }
+        }
+
         EvaluationResult result = evaluationOrchestrator.evaluateSubmission(
                 submissionId, evaluationMethod);
         EvaluationResultResponse response = EvaluationResultResponse.fromEntity(result, objectMapper);
@@ -76,6 +85,7 @@ public class EvaluationController {
         status.put("status", "UP");
         status.put("llmEnabled", llmProviderConfig.isLlmEnabled());
         status.put("llmProvider", llmProviderConfig.getDefaultProvider());
+        status.put("maxLlmRunsPerSubmission", llmProviderConfig.getMaxLlmRunsPerSubmission());
         return ResponseEntity.ok(status);
     }
 }

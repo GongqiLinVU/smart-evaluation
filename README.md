@@ -110,3 +110,21 @@ docs/               # Architecture & design documents
 | `/api/submissions/{id}`              | GET    | Authenticated | Submission detail              |
 | `/api/submissions/{id}/evaluate`      | POST   | Admin/Tutor   | Run evaluation                 |
 | `/api/submissions/{id}/adjust`        | POST   | Admin/Tutor   | Adjust score                   |
+| `/api/rules`                          | CRUD   | Admin/Tutor   | Manage evaluation rules        |
+| `/api/rule-packages`                  | CRUD   | Admin/Tutor   | Manage rule packages           |
+| `/api/llm-config`                     | CRUD   | Admin/Tutor   | Manage LLM configurations      |
+| `/api/llm-config/{id}/preview`        | POST   | Admin/Tutor   | Preview assembled LLM prompt   |
+| `/api/scoring/weights`                | GET/PUT| Admin         | Configure scoring weights      |
+| `/api/scoring/composite/{submissionId}` | GET  | Authenticated | Get composite score            |
+
+## Documentation
+
+Detailed design documents are available in the `docs/` directory:
+
+| Document | Description |
+|----------|-------------|
+| [Rule Engine Design](docs/rule-engine-design.md) | Rule-based evaluation engine, rule packages, scoring configuration |
+| [LLM Evaluation Design](docs/llm-evaluation-design.md) | Multi-round LLM evaluation, dynamic prompts, evidence format, LLM config |
+| [Rubric Design](docs/rubric-design.md) | Detailed rubric with sub-criteria, scoring guides, evidence mapping |
+| [System Architecture](docs/architecture.md) | Full system architecture, agent roles, decision pipeline |
+| [System Overview](docs/system-overview.md) | High-level system overview |

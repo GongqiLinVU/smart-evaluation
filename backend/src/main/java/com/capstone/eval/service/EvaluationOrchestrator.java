@@ -7,12 +7,14 @@ import com.capstone.eval.evaluation.rule.RuleBasedEngine;
 import com.capstone.eval.exception.EvaluationException;
 import com.capstone.eval.model.EvaluationResult;
 import com.capstone.eval.model.ParsedDocumentEntity;
+import com.capstone.eval.model.RulePackage;
 import com.capstone.eval.model.Submission;
 import com.capstone.eval.model.enums.EvaluationMethod;
 import com.capstone.eval.model.enums.EvaluationStatus;
 import com.capstone.eval.parser.ParsedDocument;
 import com.capstone.eval.repository.EvaluationResultRepository;
 import com.capstone.eval.repository.ParsedDocumentRepository;
+import com.capstone.eval.repository.RulePackageRepository;
 import com.capstone.eval.repository.SubmissionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class EvaluationOrchestrator {
     private final LlmEvaluationEngine llmEvaluationEngine;
     private final EvaluationResultRepository evaluationResultRepository;
     private final ParsedDocumentRepository parsedDocumentRepository;
+    private final RulePackageRepository rulePackageRepository;
     private final LlmProviderConfig llmProviderConfig;
     private final ObjectMapper objectMapper;
 
@@ -66,22 +69,21 @@ public class EvaluationOrchestrator {
             submission.setStatus(EvaluationStatus.EVALUATING);
             submissionRepository.save(submission);
 
-            // 4. Pick the evaluation engine based on method
-            EvaluationEngine engine;
+            // 4. Run evaluation
+            EvaluationResult result;
             if (method == EvaluationMethod.RULE_BASED) {
-                engine = ruleBasedEngine;
+                RulePackage rulePackage = resolveRulePackage(submission);
+                result = ruleBasedEngine.evaluate(parsedDoc, submission, rulePackage);
             } else if (method == EvaluationMethod.LLM) {
                 if (!llmProviderConfig.isLlmEnabled()) {
                     throw new EvaluationException(
                             "LLM evaluation is not enabled. Set eval.llm.enabled=true in configuration.");
                 }
-                engine = llmEvaluationEngine;
+                RulePackage llmRulePackage = resolveRulePackage(submission);
+                result = llmEvaluationEngine.evaluate(parsedDoc, submission, llmRulePackage);
             } else {
                 throw new EvaluationException("Unsupported evaluation method: " + method);
             }
-
-            // 5. Run evaluation
-            EvaluationResult result = engine.evaluate(parsedDoc, submission);
 
             // 6. Save result to database
             EvaluationResult savedResult = evaluationResultRepository.save(result);
@@ -107,5 +109,15 @@ public class EvaluationOrchestrator {
             throw new EvaluationException("Evaluation failed for submission id "
                     + submissionId + ": " + e.getMessage(), e);
         }
+    }
+
+    private RulePackage resolveRulePackage(Submission submission) {
+        if (submission.getTask() != null && submission.getTask().getRulePackage() != null) {
+            return submission.getTask().getRulePackage();
+        }
+        if (submission.getProject() != null && submission.getProject().getRulePackage() != null) {
+            return submission.getProject().getRulePackage();
+        }
+        return rulePackageRepository.findByIsDefaultTrue().orElse(null);
     }
 }

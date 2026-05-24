@@ -37,9 +37,10 @@ import {
   createProjectTask,
   updateProjectTask,
   deleteProjectTask,
+  listRulePackages,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import type { ProjectResponse, ProjectMemberResponse, UserResponse, ProjectTaskResponse } from '../types';
+import type { ProjectResponse, ProjectMemberResponse, UserResponse, ProjectTaskResponse, RulePackageResponse } from '../types';
 
 const { Title } = Typography;
 
@@ -68,6 +69,7 @@ export default function ProjectsPage() {
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ProjectTaskResponse | null>(null);
   const [taskForm] = Form.useForm();
+  const [rulePackages, setRulePackages] = useState<RulePackageResponse[]>([]);
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -83,6 +85,7 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     fetchProjects();
+    listRulePackages().then(setRulePackages).catch(() => {});
   }, []);
 
   const handleCreateOrUpdate = async (values: {
@@ -90,6 +93,7 @@ export default function ProjectsPage() {
     academicYear: string;
     semester: string;
     description?: string;
+    rulePackageId?: number;
   }) => {
     try {
       if (editingProject) {
@@ -125,6 +129,7 @@ export default function ProjectsPage() {
       academicYear: project.academicYear,
       semester: project.semester,
       description: project.description,
+      rulePackageId: project.rulePackageId,
     });
     setModalOpen(true);
   };
@@ -214,6 +219,7 @@ export default function ProjectsPage() {
       name: task.name,
       description: task.description,
       displayOrder: task.displayOrder,
+      rulePackageId: task.rulePackageId,
     });
     setTaskModalOpen(true);
   };
@@ -222,6 +228,7 @@ export default function ProjectsPage() {
     name: string;
     description?: string;
     displayOrder?: number;
+    rulePackageId?: number;
   }) => {
     if (!tasksProject) return;
     try {
@@ -270,6 +277,13 @@ export default function ProjectsPage() {
       title: 'Semester',
       dataIndex: 'semester',
       key: 'semester',
+    },
+    {
+      title: 'Rule Package',
+      dataIndex: 'rulePackageName',
+      key: 'rulePackageName',
+      render: (name: string | null) =>
+        name ? <Tag color="geekblue">{name}</Tag> : <Tag>Default</Tag>,
     },
     {
       title: 'Members',
@@ -435,6 +449,16 @@ export default function ProjectsPage() {
           <Form.Item name="description" label="Description">
             <Input.TextArea rows={3} placeholder="Optional description" />
           </Form.Item>
+          <Form.Item name="rulePackageId" label="Rule Package">
+            <Select
+              placeholder="Use default rule package"
+              allowClear
+              options={rulePackages.map((rp) => ({
+                label: `${rp.name}${rp.isDefault ? ' (Default)' : ''}`,
+                value: rp.id,
+              }))}
+            />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -532,6 +556,13 @@ export default function ProjectsPage() {
                 ellipsis: true,
               },
               {
+                title: 'Rule Package',
+                dataIndex: 'rulePackageName',
+                key: 'rulePackageName',
+                render: (name: string | null) =>
+                  name ? <Tag color="geekblue">{name}</Tag> : <Tag>Inherit</Tag>,
+              },
+              {
                 title: 'Actions',
                 key: 'actions',
                 render: (_: unknown, record: ProjectTaskResponse) => (
@@ -581,6 +612,16 @@ export default function ProjectsPage() {
           </Form.Item>
           <Form.Item name="displayOrder" label="Display Order">
             <Input type="number" placeholder="0" style={{ width: 100 }} />
+          </Form.Item>
+          <Form.Item name="rulePackageId" label="Rule Package">
+            <Select
+              placeholder="Inherit from project"
+              allowClear
+              options={rulePackages.map((rp) => ({
+                label: `${rp.name}${rp.isDefault ? ' (Default)' : ''}`,
+                value: rp.id,
+              }))}
+            />
           </Form.Item>
         </Form>
       </Modal>

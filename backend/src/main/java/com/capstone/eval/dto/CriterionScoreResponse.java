@@ -15,15 +15,18 @@ public record CriterionScoreResponse(
         Integer score,
         String level,
         String justification,
-        List<String> evidence,
-        Map<String, Object> subScores
+        List<Object> evidence,
+        Map<String, Object> subScores,
+        Double confidence,
+        List<String> suggestions
 ) {
 
     private static final Logger log = LoggerFactory.getLogger(CriterionScoreResponse.class);
 
     public static CriterionScoreResponse fromEntity(CriterionScore cs, ObjectMapper mapper) {
-        List<String> evidenceList = deserializeList(cs.getEvidence(), mapper);
+        List<Object> evidenceList = deserializeObjectList(cs.getEvidence(), mapper);
         Map<String, Object> subScoresMap = deserializeMap(cs.getSubScores(), mapper);
+        List<String> suggestionsList = deserializeStringList(cs.getSuggestions(), mapper);
 
         return new CriterionScoreResponse(
                 cs.getCriterionName(),
@@ -31,11 +34,13 @@ public record CriterionScoreResponse(
                 cs.getLevel() != null ? cs.getLevel().name() : null,
                 cs.getJustification(),
                 evidenceList,
-                subScoresMap
+                subScoresMap,
+                cs.getConfidence(),
+                suggestionsList
         );
     }
 
-    private static List<String> deserializeList(String json, ObjectMapper mapper) {
+    private static List<Object> deserializeObjectList(String json, ObjectMapper mapper) {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
         }
@@ -43,6 +48,18 @@ public record CriterionScoreResponse(
             return mapper.readValue(json, new TypeReference<>() {});
         } catch (Exception e) {
             log.warn("Failed to deserialize evidence JSON: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private static List<String> deserializeStringList(String json, ObjectMapper mapper) {
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            return mapper.readValue(json, new TypeReference<>() {});
+        } catch (Exception e) {
+            log.warn("Failed to deserialize suggestions JSON: {}", e.getMessage());
             return Collections.emptyList();
         }
     }

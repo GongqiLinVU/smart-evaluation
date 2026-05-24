@@ -18,11 +18,16 @@ import {
   Form,
   InputNumber,
   List,
+  Modal,
+  Table,
+  Tooltip,
 } from 'antd';
 import {
   ArrowLeftOutlined,
   RobotOutlined,
   ToolOutlined,
+  FileTextOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -32,6 +37,8 @@ import {
   getFeedback,
   adjustScore,
   getAdjustments,
+  getHealth,
+  getTutorReview,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import type {
@@ -39,11 +46,14 @@ import type {
   EvaluationResultResponse,
   StudentFeedbackResponse,
   ScoreAdjustmentResponse,
+  TutorReviewResponse,
 } from '../types';
 import ScoreSummary from '../components/ScoreSummary';
 import ScoreCard from '../components/ScoreCard';
 import DocumentStats from '../components/DocumentStats';
 import FeedbackPanel from '../components/FeedbackPanel';
+import TutorReviewPanel from '../components/TutorReviewPanel';
+import CompositeScorePanel from '../components/CompositeScorePanel';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -70,6 +80,14 @@ export default function ResultPage() {
   >({});
   const [feedbackForm] = Form.useForm();
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [rawResponseModal, setRawResponseModal] = useState<string | null>(null);
+  const [selectedEvaluation, setSelectedEvaluation] =
+    useState<EvaluationResultResponse | null>(null);
+  const [maxLlmRuns, setMaxLlmRuns] = useState<number>(3);
+  const [tutorReview, setTutorReview] = useState<TutorReviewResponse | null>(
+    null,
+  );
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -81,12 +99,25 @@ export default function ResultPage() {
       const fb = await getFeedback(Number(id));
       setFeedbacks(fb);
 
+      const tr = await getTutorReview(Number(id));
+      setTutorReview(tr);
+      setRefreshKey((k) => k + 1);
+
       const adjMap: Record<number, ScoreAdjustmentResponse[]> = {};
       for (const ev of data.evaluations) {
         const adj = await getAdjustments(ev.id);
         if (adj.length > 0) adjMap[ev.id] = adj;
       }
       setAdjustments(adjMap);
+
+      if (data.evaluations.length > 0 && !selectedEvaluation) {
+        setSelectedEvaluation(data.evaluations[data.evaluations.length - 1]);
+      } else if (selectedEvaluation) {
+        const updated = data.evaluations.find(
+          (e) => e.id === selectedEvaluation.id,
+        );
+        if (updated) setSelectedEvaluation(updated);
+      }
     } catch {
       message.error('Failed to load submission details');
     } finally {
@@ -98,15 +129,28 @@ export default function ResultPage() {
     fetchDetail();
   }, [fetchDetail]);
 
+  useEffect(() => {
+    getHealth()
+      .then((h) => {
+        if (h.maxLlmRunsPerSubmission) setMaxLlmRuns(h.maxLlmRunsPerSubmission);
+      })
+      .catch(() => {});
+  }, []);
+
+  const llmRunCount =
+    detail?.evaluations.filter((e) => e.method === 'LLM').length ?? 0;
+  const llmLimitReached = llmRunCount >= maxLlmRuns;
+
   const handleRunEvaluation = async (method: 'RULE_BASED' | 'LLM') => {
     if (!id) return;
     setEvalLoading(true);
     setEvalMethod(method);
     try {
-      await runEvaluation(Number(id), method);
+      const result = await runEvaluation(Number(id), method);
       message.success(
         `${method === 'RULE_BASED' ? 'Rule-based' : 'LLM'} evaluation completed!`,
       );
+      setSelectedEvaluation(result);
       await fetchDetail();
     } catch {
       message.error('Evaluation failed. Please try again.');
@@ -174,7 +218,6 @@ export default function ResultPage() {
   }
 
   const { submission, documentStats, evaluations } = detail;
-  const hasRuleBased = evaluations.some((e) => e.method === 'RULE_BASED');
 
   return (
     <Spin
@@ -195,23 +238,30 @@ export default function ResultPage() {
             <Button icon={<ArrowLeftOutlined />}>Back</Button>
           </Link>
           <Space>
-            {!hasRuleBased && (
-              <Button
-                type="primary"
-                icon={<ToolOutlined />}
-                onClick={() => handleRunEvaluation('RULE_BASED')}
-                loading={evalLoading && evalMethod === 'RULE_BASED'}
-              >
-                Run Rule-Based Evaluation
-              </Button>
-            )}
             <Button
-              icon={<RobotOutlined />}
-              onClick={() => handleRunEvaluation('LLM')}
-              loading={evalLoading && evalMethod === 'LLM'}
+              type="primary"
+              icon={<ToolOutlined />}
+              onClick={() => handleRunEvaluation('RULE_BASED')}
+              loading={evalLoading && evalMethod === 'RULE_BASED'}
             >
-              Run LLM Evaluation
+              Run Rule-Based Evaluation
             </Button>
+            <Tooltip
+              title={
+                llmLimitReached
+                  ? `LLM evaluation limit reached (${maxLlmRuns} runs)`
+                  : `${llmRunCount}/${maxLlmRuns} LLM runs used`
+              }
+            >
+              <Button
+                icon={<RobotOutlined />}
+                onClick={() => handleRunEvaluation('LLM')}
+                loading={evalLoading && evalMethod === 'LLM'}
+                disabled={llmLimitReached}
+              >
+                Run LLM Evaluation ({llmRunCount}/{maxLlmRuns})
+              </Button>
+            </Tooltip>
           </Space>
         </div>
 
@@ -269,101 +319,227 @@ export default function ResultPage() {
         {/* Document Stats */}
         {documentStats && <DocumentStats stats={documentStats} />}
 
-        {/* Evaluations */}
+        {/* Composite Score */}
+        <CompositeScorePanel submissionId={Number(id)} refreshKey={refreshKey} />
+
+        {/* Evaluation History */}
         {evaluations.length === 0 ? (
           <Alert
             message="No Evaluations Yet"
             description="This submission has not been evaluated. Click the button above to run an evaluation."
             type="info"
             showIcon
+            style={{ marginBottom: 24 }}
           />
         ) : (
-          evaluations.map((evaluation: EvaluationResultResponse) => (
-            <Card
-              key={evaluation.id}
-              style={{ marginBottom: 24 }}
-              title={
-                <Space>
-                  <Title level={4} style={{ margin: 0 }}>
-                    Evaluation #{evaluation.id}
-                  </Title>
-                  <Tag
-                    color={
-                      evaluation.method === 'RULE_BASED' ? 'purple' : 'cyan'
-                    }
-                  >
-                    {evaluation.method === 'RULE_BASED' ? 'Rule-Based' : 'LLM'}
-                  </Tag>
-                  <Tag>
-                    {dayjs(evaluation.evaluatedAt).format('YYYY-MM-DD HH:mm')}
-                  </Tag>
-                </Space>
+          <Card
+            title="Evaluation History"
+            style={{ marginBottom: 24 }}
+          >
+            <Table
+              dataSource={[...evaluations].sort(
+                (a, b) =>
+                  dayjs(b.evaluatedAt).valueOf() -
+                  dayjs(a.evaluatedAt).valueOf(),
+              )}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              rowClassName={(record) =>
+                record.id === selectedEvaluation?.id
+                  ? 'ant-table-row-selected'
+                  : ''
               }
-            >
-              <ScoreSummary
-                score={evaluation.overallScore}
-                level={evaluation.overallLevel}
-                method={evaluation.method}
-              />
+              columns={[
+                {
+                  title: '#',
+                  dataIndex: 'id',
+                  width: 60,
+                },
+                {
+                  title: 'Method',
+                  dataIndex: 'method',
+                  width: 120,
+                  render: (method: string) => (
+                    <Tag color={method === 'RULE_BASED' ? 'purple' : 'cyan'}>
+                      {method === 'RULE_BASED' ? 'Rule-Based' : 'LLM'}
+                    </Tag>
+                  ),
+                },
+                {
+                  title: 'Score',
+                  dataIndex: 'overallScore',
+                  width: 80,
+                  render: (score: number) => `${score}/30`,
+                },
+                {
+                  title: 'Level',
+                  dataIndex: 'overallLevel',
+                  width: 120,
+                  render: (level: string) => (
+                    <Tag>{level?.replace('_', ' ')}</Tag>
+                  ),
+                },
+                {
+                  title: 'Date',
+                  dataIndex: 'evaluatedAt',
+                  render: (date: string) =>
+                    dayjs(date).format('YYYY-MM-DD HH:mm'),
+                },
+                {
+                  title: 'Action',
+                  width: 100,
+                  render: (_: unknown, record: EvaluationResultResponse) => (
+                    <Button
+                      type="link"
+                      icon={<EyeOutlined />}
+                      onClick={() => setSelectedEvaluation(record)}
+                    >
+                      View
+                    </Button>
+                  ),
+                },
+              ]}
+            />
+          </Card>
+        )}
 
-              <Divider />
+        {/* Selected Evaluation Detail */}
+        {selectedEvaluation && (
+          <Card
+            style={{ marginBottom: 24 }}
+            title={
+              <Space>
+                <Title level={4} style={{ margin: 0 }}>
+                  Evaluation #{selectedEvaluation.id}
+                </Title>
+                <Tag
+                  color={
+                    selectedEvaluation.method === 'RULE_BASED'
+                      ? 'purple'
+                      : 'cyan'
+                  }
+                >
+                  {selectedEvaluation.method === 'RULE_BASED'
+                    ? 'Rule-Based'
+                    : 'LLM'}
+                </Tag>
+                <Tag>
+                  {dayjs(selectedEvaluation.evaluatedAt).format(
+                    'YYYY-MM-DD HH:mm',
+                  )}
+                </Tag>
+              </Space>
+            }
+            extra={
+              selectedEvaluation.method === 'LLM' &&
+              selectedEvaluation.rawLlmResponse ? (
+                <Button
+                  size="small"
+                  icon={<FileTextOutlined />}
+                  onClick={() =>
+                    setRawResponseModal(selectedEvaluation.rawLlmResponse)
+                  }
+                >
+                  View Raw Response
+                </Button>
+              ) : undefined
+            }
+          >
+            <ScoreSummary
+              score={selectedEvaluation.overallScore}
+              level={selectedEvaluation.overallLevel}
+              method={selectedEvaluation.method}
+            />
 
-              <Title level={5}>Criterion Scores</Title>
-              <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                {evaluation.criteria.map((criterion) => (
-                  <Col key={criterion.criterionName} xs={24} md={8}>
-                    <ScoreCard criterion={criterion} />
-                  </Col>
-                ))}
-              </Row>
+            <Divider />
 
-              <Divider />
+            <Title level={5}>Criterion Scores</Title>
+            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+              {selectedEvaluation.criteria.map((criterion) => (
+                <Col key={criterion.criterionName} xs={24} md={8}>
+                  <ScoreCard criterion={criterion} />
+                </Col>
+              ))}
+            </Row>
 
-              <FeedbackPanel
-                strengths={evaluation.strengths}
-                improvements={evaluation.improvements}
-                overallFeedback={evaluation.overallFeedback}
-              />
+            <Divider />
 
-              {/* Score Adjustments History */}
-              {adjustments[evaluation.id] &&
-                adjustments[evaluation.id].length > 0 && (
-                  <>
-                    <Divider />
-                    <Title level={5}>Score Adjustments</Title>
-                    <List
-                      size="small"
-                      dataSource={adjustments[evaluation.id]}
-                      renderItem={(adj) => (
-                        <List.Item>
-                          <Text>
-                            <strong>{adj.tutorName}</strong> adjusted score from{' '}
-                            {adj.originalScore} to {adj.adjustedScore}
-                            {adj.reason && ` — "${adj.reason}"`} (
-                            {dayjs(adj.adjustedAt).format('YYYY-MM-DD HH:mm')})
-                          </Text>
-                        </List.Item>
-                      )}
-                    />
-                  </>
-                )}
+            <FeedbackPanel
+              strengths={selectedEvaluation.strengths}
+              improvements={selectedEvaluation.improvements}
+              overallFeedback={selectedEvaluation.overallFeedback}
+            />
 
-              {/* Tutor: Adjust Score */}
-              {(isAdmin || isTutor) && (
+            {/* Score Adjustments History */}
+            {adjustments[selectedEvaluation.id] &&
+              adjustments[selectedEvaluation.id].length > 0 && (
                 <>
                   <Divider />
-                  <Title level={5}>Adjust Score</Title>
-                  <AdjustScoreForm
-                    currentScore={evaluation.overallScore}
-                    onSubmit={(score, reason) =>
-                      handleAdjustScore(evaluation.id, score, reason)
-                    }
+                  <Title level={5}>Score Adjustments</Title>
+                  <List
+                    size="small"
+                    dataSource={adjustments[selectedEvaluation.id]}
+                    renderItem={(adj) => (
+                      <List.Item>
+                        <Text>
+                          <strong>{adj.tutorName}</strong> adjusted score from{' '}
+                          {adj.originalScore} to {adj.adjustedScore}
+                          {adj.reason && ` — "${adj.reason}"`} (
+                          {dayjs(adj.adjustedAt).format('YYYY-MM-DD HH:mm')})
+                        </Text>
+                      </List.Item>
+                    )}
                   />
                 </>
               )}
-            </Card>
-          ))
+
+            {/* Tutor: Adjust Score */}
+            {(isAdmin || isTutor) && (
+              <>
+                <Divider />
+                <Title level={5}>Adjust Score</Title>
+                <AdjustScoreForm
+                  currentScore={selectedEvaluation.overallScore}
+                  onSubmit={(score, reason) =>
+                    handleAdjustScore(selectedEvaluation.id, score, reason)
+                  }
+                />
+              </>
+            )}
+          </Card>
         )}
+
+        {/* Raw Response Modal */}
+        <Modal
+          title="Raw LLM Response"
+          open={rawResponseModal !== null}
+          onCancel={() => setRawResponseModal(null)}
+          footer={null}
+          width={700}
+        >
+          <pre
+            style={{
+              background: '#f5f5f5',
+              padding: 12,
+              borderRadius: 4,
+              maxHeight: 500,
+              overflow: 'auto',
+              fontSize: 12,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {rawResponseModal}
+          </pre>
+        </Modal>
+
+        {/* Tutor Review */}
+        <TutorReviewPanel
+          submissionId={Number(id)}
+          review={tutorReview}
+          canEdit={isAdmin || isTutor}
+          onRefresh={fetchDetail}
+        />
 
         {/* Student Feedback */}
         <Card title="Your Feedback" style={{ marginBottom: 24 }}>

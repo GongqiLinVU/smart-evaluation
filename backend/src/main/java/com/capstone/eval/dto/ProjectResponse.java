@@ -11,7 +11,9 @@ public record ProjectResponse(
         String semester,
         String description,
         LocalDateTime createdAt,
-        int memberCount
+        int memberCount,
+        Long rulePackageId,
+        String rulePackageName
 ) {
 
     public static ProjectResponse fromEntity(Project project, int memberCount) {
@@ -22,7 +24,9 @@ public record ProjectResponse(
                 project.getSemester(),
                 project.getDescription(),
                 project.getCreatedAt(),
-                memberCount
+                memberCount,
+                project.getRulePackage() != null ? project.getRulePackage().getId() : null,
+                project.getRulePackage() != null ? project.getRulePackage().getName() : null
         );
     }
 }

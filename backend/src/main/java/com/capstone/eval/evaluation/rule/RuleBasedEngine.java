@@ -3,6 +3,7 @@ package com.capstone.eval.evaluation.rule;
 import com.capstone.eval.evaluation.EvaluationEngine;
 import com.capstone.eval.model.CriterionScore;
 import com.capstone.eval.model.EvaluationResult;
+import com.capstone.eval.model.RulePackage;
 import com.capstone.eval.model.Submission;
 import com.capstone.eval.model.enums.EvaluationMethod;
 import com.capstone.eval.model.enums.PerformanceLevel;
@@ -36,6 +37,40 @@ public class RuleBasedEngine implements EvaluationEngine {
     private final ImplementationDetailRule implementationRule;
     private final ObjectMapper objectMapper;
 
+    public EvaluationResult evaluate(ParsedDocument document, Submission submission, RulePackage rulePackage) {
+        log.info("Starting rule-based evaluation for submission id={} with rule package '{}'",
+                submission.getId(), rulePackage != null ? rulePackage.getName() : "default");
+
+        List<CriterionResult> results = new ArrayList<>();
+        List<Double> weights = new ArrayList<>();
+
+        boolean usePackage = rulePackage != null;
+        boolean logicEnabled = !usePackage || Boolean.TRUE.equals(rulePackage.getLogicEnabled());
+        boolean methodologyEnabled = !usePackage || Boolean.TRUE.equals(rulePackage.getMethodologyEnabled());
+        boolean implementationEnabled = !usePackage || Boolean.TRUE.equals(rulePackage.getImplementationEnabled());
+
+        if (logicEnabled) {
+            results.add(logicRule.evaluate(document));
+            weights.add(usePackage ? rulePackage.getLogicWeight() : 1.0);
+        }
+        if (methodologyEnabled) {
+            results.add(methodologyRule.evaluate(document));
+            weights.add(usePackage ? rulePackage.getMethodologyWeight() : 1.0);
+        }
+        if (implementationEnabled) {
+            results.add(implementationRule.evaluate(document));
+            weights.add(usePackage ? rulePackage.getImplementationWeight() : 1.0);
+        }
+
+        double totalWeight = weights.stream().mapToDouble(Double::doubleValue).sum();
+        double overallRawScore = 0;
+        for (int i = 0; i < results.size(); i++) {
+            overallRawScore += results.get(i).getRawScore() * (weights.get(i) / totalWeight);
+        }
+
+        return buildResult(document, submission, results, overallRawScore);
+    }
+
     @Override
     public EvaluationResult evaluate(ParsedDocument document, Submission submission) {
         log.info("Starting rule-based evaluation for submission id={}", submission.getId());
@@ -53,19 +88,20 @@ public class RuleBasedEngine implements EvaluationEngine {
                 .average()
                 .orElse(0);
 
-        // 3. Map to overall PerformanceLevel
+        return buildResult(document, submission, results, overallRawScore);
+    }
+
+    private EvaluationResult buildResult(ParsedDocument document, Submission submission,
+                                         List<CriterionResult> results, double overallRawScore) {
         PerformanceLevel overallLevel = PerformanceLevel.fromRawScore(overallRawScore);
         int overallPoints = overallLevel.getPoints();
 
-        // 4. Generate strengths, improvements, and overall feedback
         List<String> strengths = buildStrengths(results);
         List<String> improvements = buildImprovements(results);
         String overallFeedback = buildOverallFeedback(results, overallRawScore, overallLevel);
 
-        // 5. Convert CriterionResults to CriterionScore entities
         List<CriterionScore> criterionScores = new ArrayList<>();
 
-        // 6. Build the EvaluationResult
         EvaluationResult evaluationResult = EvaluationResult.builder()
                 .submission(submission)
                 .method(EvaluationMethod.RULE_BASED)
@@ -74,13 +110,12 @@ public class RuleBasedEngine implements EvaluationEngine {
                 .overallFeedback(overallFeedback)
                 .strengths(toJson(strengths))
                 .improvements(toJson(improvements))
-                .confidence(null) // rule-based engine does not produce a confidence score
+                .confidence(null)
                 .rawLlmResponse(null)
                 .evaluatedAt(LocalDateTime.now())
                 .criterionScores(criterionScores)
                 .build();
 
-        // Convert each CriterionResult into a JPA CriterionScore and link it
         for (CriterionResult cr : results) {
             CriterionScore cs = CriterionScore.builder()
                     .evaluationResult(evaluationResult)

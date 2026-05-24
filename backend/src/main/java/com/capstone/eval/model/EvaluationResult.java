@@ -57,6 +57,10 @@ public class EvaluationResult {
     @Builder.Default
     private List<CriterionScore> criterionScores = new ArrayList<>();
 
+    @OneToMany(mappedBy = "evaluationResult", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<EvaluationRound> rounds = new ArrayList<>();
+
     @PrePersist
     protected void onCreate() {
         if (evaluatedAt == null) {

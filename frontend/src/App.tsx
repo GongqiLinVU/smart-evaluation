@@ -8,6 +8,9 @@ import {
   TeamOutlined,
   LogoutOutlined,
   ProjectOutlined,
+  SettingOutlined,
+  ExperimentOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useAuth } from './context/AuthContext';
@@ -22,6 +25,9 @@ import ResultPage from './pages/ResultPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import ProjectsPage from './pages/ProjectsPage';
+import ScoringSettingsPage from './pages/ScoringSettingsPage';
+import RulePackagesPage from './pages/RulePackagesPage';
+import LlmConfigPage from './pages/LlmConfigPage';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -43,9 +49,15 @@ function AuthenticatedApp() {
       ? '/upload'
       : location.pathname.startsWith('/projects')
         ? '/projects'
-        : location.pathname.startsWith('/admin')
-          ? '/admin/users'
-          : '/';
+        : location.pathname.startsWith('/admin/rules')
+          ? '/admin/rules'
+          : location.pathname.startsWith('/admin/llm-config')
+            ? '/admin/llm-config'
+            : location.pathname.startsWith('/admin/scoring')
+              ? '/admin/scoring'
+              : location.pathname.startsWith('/admin')
+                ? '/admin/users'
+                : '/';
 
   const menuItems: MenuProps['items'] = [
     {
@@ -74,6 +86,16 @@ function AuthenticatedApp() {
       icon: <UnorderedListOutlined />,
       label: <Link to="/submissions">All Submissions</Link>,
     });
+    menuItems.push({
+      key: '/admin/rules',
+      icon: <ExperimentOutlined />,
+      label: <Link to="/admin/rules">Rules</Link>,
+    });
+    menuItems.push({
+      key: '/admin/llm-config',
+      icon: <RobotOutlined />,
+      label: <Link to="/admin/llm-config">LLM Config</Link>,
+    });
   }
 
   if (isAdmin) {
@@ -81,6 +103,11 @@ function AuthenticatedApp() {
       key: '/admin/users',
       icon: <TeamOutlined />,
       label: <Link to="/admin/users">Users</Link>,
+    });
+    menuItems.push({
+      key: '/admin/scoring',
+      icon: <SettingOutlined />,
+      label: <Link to="/admin/scoring">Scoring</Link>,
     });
   }
 
@@ -161,10 +188,19 @@ function AuthenticatedApp() {
           {(isAdmin || isTutor) && (
             <Route path="/submissions" element={<SubmissionListPage />} />
           )}
+          {(isAdmin || isTutor) && (
+            <Route path="/admin/rules" element={<RulePackagesPage />} />
+          )}
+          {(isAdmin || isTutor) && (
+            <Route path="/admin/llm-config" element={<LlmConfigPage />} />
+          )}
           <Route path="/submissions/:id" element={<ResultPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           {isAdmin && (
             <Route path="/admin/users" element={<AdminUsersPage />} />
+          )}
+          {isAdmin && (
+            <Route path="/admin/scoring" element={<ScoringSettingsPage />} />
           )}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

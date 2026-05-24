@@ -1,0 +1,44 @@
+I. Results Comparison
+Rule-Based (#2)	LLM Run 1 (#3)	LLM Run 2 (#4)
+Overall Score	21/30 PROFICIENT	18/30 COMPETENT	18/30 COMPETENT
+Logic & Explanation	18 (COMPETENT)	18 (COMPETENT)	18 (COMPETENT)
+Methodology	24 (PROFICIENT)	18 (COMPETENT)	18 (COMPETENT)
+Implementation Detail	24 (PROFICIENT)	18 (COMPETENT)	18 (COMPETENT)
+
+
+
+II. My Observations
+
+1. Rule-based is generous on surface features, LLM is stricter on depth.
+
+The rule-based engine gives high scores for things it can count — "47 configuration keywords" = 100/100, "7 design patterns mentioned" = 100/100. But it can't judge whether those mentions are meaningful. The LLM correctly identifies that patterns are "mentioned but not explained in depth."
+
+2. LLM is very consistent but too coarse.
+
+Both LLM runs returned identical 18/18/18. That's good for reliability, but the 5-level scale (6/12/18/24/30) means every criterion jumps in 6-point increments — a student scoring 17/30 looks identical to one scoring 13/30. There's no nuance within a level.
+
+3. Neither captures what a tutor would see.
+
+A tutor who supervised this project might know:
+
+- The student contributed strongly to the team's architecture discussions
+- The demo went well and showed working code
+- The student iterated on feedback from earlier drafts
+- The document structure improved significantly from v1 to v2
+
+None of that lives in the document text.
+
+
+
+
+
+III. My Recommendation: "Tutor Review Dimensions"
+
+I think we need a Tutor Interaction Review layer — not just score adjustment (which we have), but structured qualitative input that becomes part of the final grade. Here's what I'm thinking:
+
+- Flexible scoring scale — Allow scores at any integer (0-30), not just the 5 fixed levels
+- Tutor review dimensions — Configurable additional criteria tutors can rate (e.g., "Presentation & Demo", "Iterative Improvement", "Group Contribution", "Critical Thinking")
+- Weighted final score — Combine rule-based + LLM + tutor reviews with configurable weights (e.g., 30% rule-based, 30% LLM, 40% tutor)
+- Tutor notes per criterion — Not just a global score adjustment, but per-criterion comments like "Student explained architecture well in the demo, upgrading from COMPETENT to PROFICIENT"
+This gives you the balance: automation handles the objective/structural analysis, the LLM handles semantic depth, and the tutor handles the human context that neither can see.
+

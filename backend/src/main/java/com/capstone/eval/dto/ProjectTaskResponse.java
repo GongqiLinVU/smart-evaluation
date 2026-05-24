@@ -10,6 +10,8 @@ public record ProjectTaskResponse(
         String name,
         String description,
         Integer displayOrder,
+        Long rulePackageId,
+        String rulePackageName,
         LocalDateTime createdAt
 ) {
 
@@ -20,6 +22,8 @@ public record ProjectTaskResponse(
                 task.getName(),
                 task.getDescription(),
                 task.getDisplayOrder(),
+                task.getRulePackage() != null ? task.getRulePackage().getId() : null,
+                task.getRulePackage() != null ? task.getRulePackage().getName() : null,
                 task.getCreatedAt()
         );
     }

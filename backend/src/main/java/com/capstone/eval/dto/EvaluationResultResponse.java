@@ -21,6 +21,7 @@ public record EvaluationResultResponse(
         List<String> strengths,
         List<String> improvements,
         Double confidence,
+        String rawLlmResponse,
         LocalDateTime evaluatedAt,
         List<CriterionScoreResponse> criteria
 ) {
@@ -47,6 +48,7 @@ public record EvaluationResultResponse(
                 strengthsList,
                 improvementsList,
                 result.getConfidence(),
+                result.getRawLlmResponse(),
                 result.getEvaluatedAt(),
                 criteriaList
         );

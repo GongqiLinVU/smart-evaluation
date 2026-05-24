@@ -5,11 +5,13 @@ import com.capstone.eval.dto.CreateProjectTaskRequest;
 import com.capstone.eval.model.Project;
 import com.capstone.eval.model.ProjectMember;
 import com.capstone.eval.model.ProjectTask;
+import com.capstone.eval.model.RulePackage;
 import com.capstone.eval.model.User;
 import com.capstone.eval.model.enums.Role;
 import com.capstone.eval.repository.ProjectMemberRepository;
 import com.capstone.eval.repository.ProjectRepository;
 import com.capstone.eval.repository.ProjectTaskRepository;
+import com.capstone.eval.repository.RulePackageRepository;
 import com.capstone.eval.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final ProjectTaskRepository projectTaskRepository;
+    private final RulePackageRepository rulePackageRepository;
     private final UserRepository userRepository;
 
     public Project createProject(CreateProjectRequest request) {
@@ -31,11 +34,18 @@ public class ProjectService {
     }
 
     public Project createProject(CreateProjectRequest request, Long creatorId, Role creatorRole) {
+        RulePackage rulePackage = null;
+        if (request.rulePackageId() != null) {
+            rulePackage = rulePackageRepository.findById(request.rulePackageId())
+                    .orElseThrow(() -> new RuntimeException("Rule package not found: " + request.rulePackageId()));
+        }
+
         Project project = Project.builder()
                 .name(request.name())
                 .academicYear(request.academicYear())
                 .semester(request.semester())
                 .description(request.description())
+                .rulePackage(rulePackage)
                 .build();
         project = projectRepository.save(project);
 
@@ -59,6 +69,15 @@ public class ProjectService {
         project.setAcademicYear(request.academicYear());
         project.setSemester(request.semester());
         project.setDescription(request.description());
+
+        if (request.rulePackageId() != null) {
+            RulePackage rulePackage = rulePackageRepository.findById(request.rulePackageId())
+                    .orElseThrow(() -> new RuntimeException("Rule package not found: " + request.rulePackageId()));
+            project.setRulePackage(rulePackage);
+        } else {
+            project.setRulePackage(null);
+        }
+
         return projectRepository.save(project);
     }
 
@@ -134,11 +153,19 @@ public class ProjectService {
         int order = request.displayOrder() != null
                 ? request.displayOrder()
                 : projectTaskRepository.countByProjectId(projectId);
+
+        RulePackage rulePackage = null;
+        if (request.rulePackageId() != null) {
+            rulePackage = rulePackageRepository.findById(request.rulePackageId())
+                    .orElseThrow(() -> new RuntimeException("Rule package not found: " + request.rulePackageId()));
+        }
+
         ProjectTask task = ProjectTask.builder()
                 .project(project)
                 .name(request.name())
                 .description(request.description())
                 .displayOrder(order)
+                .rulePackage(rulePackage)
                 .build();
         return projectTaskRepository.save(task);
     }
@@ -150,6 +177,15 @@ public class ProjectService {
         if (request.displayOrder() != null) {
             task.setDisplayOrder(request.displayOrder());
         }
+
+        if (request.rulePackageId() != null) {
+            RulePackage rulePackage = rulePackageRepository.findById(request.rulePackageId())
+                    .orElseThrow(() -> new RuntimeException("Rule package not found: " + request.rulePackageId()));
+            task.setRulePackage(rulePackage);
+        } else {
+            task.setRulePackage(null);
+        }
+
         return projectTaskRepository.save(task);
     }
 

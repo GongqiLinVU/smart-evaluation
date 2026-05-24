@@ -1,0 +1,84 @@
+Oral Presentation (20pt)
+
+----
+
+I. Presentation Content:
+
+- Clear Structure - Technical Knowledge
+
+(Subject to student's contribution and performance)
+
+5pt HD
+
+Visual aids are highly effective, professional, and well-integrated into the presentation.
+Presentation is excellently structured with a logical flow; transitions are seamless.
+Thorough and deep coverage of topic; arguments are insightful and highly engaging.&nbsp;
+
+4pt D
+
+Visual aids are effective, well-designed, and integrated into the presentation.
+Well-structured presentation with a clear flow; transitions are smooth.
+Strong coverage of topic; arguments are clear, well-organized, and engaging.
+
+3pt C
+
+Visual aids are useful and adequately integrated, with minor issues in design or use.
+Presentation has a good structure but may have minor issues with flow/transitions.&nbsp;
+Good coverage of topic; arguments are logical and mostly well-organized.
+
+2pt P
+
+Visual aids are basic or somewhat useful but may have several design/use issues.
+Basic structure is present but may lack logical flow; transitions are sometimes awkward.
+Adequate coverage of topic; some arguments may lack clarity/organization.
+
+1pt F
+
+Visual aids are poorly designed, used ineffectively, or missing.
+Presentation lacks clear structure and logical flow; transitions are often confusing.
+Inadequate coverage of topic; arguments are unclear or not well-organized.
+
+
+II. Demonstration:
+
+- Functionality
+- Error Handling
+- Performance
+
+(Subject to student's contribution and performance)
+
+
+5pt HD
+
+All functions work flawlessly with no errors or bugs. The program operates as intended and handles edge cases.
+
+Excellent error handling with clear messages, graceful degradation, and robust recovery from unexpected inputs.
+
+The program runs smoothly with optimal performance, efficiently handling all tasks without delays or errors.
+
+
+III. Time Management:
+
+- Adherence to Time Limits
+- Effective Use of Presentation Time
+
+(Subject to student's contribution and performance)
+
+5pt HD
+
+Perfectly timed presentation, within allocated duration. Excellent pacing with no rushed or dragged sections.
+
+
+IV. Q&A Performance:
+
+- Clarity of Responses
+- Depth of Knowledge
+- Ability to Address Questions
+- Confidence and Poise
+
+(Subject to student's contribution and performance)
+
+5pt HD
+
+Excellent handling of questions. Provides clear, accurate, and insightful responses, demonstrating deep knowledge.
+

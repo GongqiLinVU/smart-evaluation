@@ -30,6 +30,10 @@ public class Project {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rule_package_id")
+    private RulePackage rulePackage;
+
     private LocalDateTime createdAt;
 
     @PrePersist

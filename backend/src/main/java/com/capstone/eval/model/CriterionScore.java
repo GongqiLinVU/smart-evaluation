@@ -38,4 +38,10 @@ public class CriterionScore {
 
     @Column(columnDefinition = "JSON")
     private String subScores;
+
+    private Double confidence;
+
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String suggestions;
 }

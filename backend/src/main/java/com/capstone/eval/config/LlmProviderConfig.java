@@ -21,6 +21,9 @@ public class LlmProviderConfig {
     @Value("${eval.llm.provider:deepseek}")
     private String defaultProvider;
 
+    @Value("${eval.llm.max-runs-per-submission:3}")
+    private int maxLlmRunsPerSubmission;
+
     @jakarta.annotation.PostConstruct
     void logConfig() {
         log.info("LLM evaluation enabled={}, default provider={}", llmEnabled, defaultProvider);

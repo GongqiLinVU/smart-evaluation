@@ -1,0 +1,139 @@
+Final Report(70pt)
+
+---
+
+
+I. Complete programming code + User manual
+
+(Subject to student's contribution and performance)
+
+
+25pt HD
+
+Code is complete, well-organized, and highly efficient. It is fully functional, well-documented, and adheres to best practices.
+Manual is thorough, clear, and user-friendly, with detailed instructions and helpful screenshots or diagrams.
+
+20pt D
+
+Code is mostly complete and functional with good organization and documentation. Minor improvements needed.
+Manual is clear and functional with good instructions and some helpful visuals.
+
+15pt C
+
+Code is generally complete with some organizational or documentation issues. Functionality may be limited.
+Manual is adequate with basic instructions and some visuals, though clarity or completeness may be lacking.
+
+10pt P
+
+Code is incomplete or poorly organized, with significant issues in functionality or documentation.
+Manual provides minimal instructions and visuals, with some areas unclear or incomplete.
+
+5pt F
+
+Code is significantly incomplete or non-functional, with major issues in organization and documentation.
+Manual is poorly written, unclear, or missing, providing little to no help for users.
+
+
+II. Technical Implementation Document
+
+(Subject to student's contribution and performance)
+
+30pt HD
+
+Provides a clear, comprehensive, and insightful explanation of the logic behind each main function, demonstrating in-depth understanding.
+
+The methodology is explained in a highly structured, clear, and concise manner, with strong justification for choices made.
+
+Detailed and precise implementation steps are provided, showing a complete understanding of how each main function was implemented.
+
+24pt D
+
+Thorough explanation of logic with good clarity, showing solid understanding of each function’s purpose and structure.
+
+Clear explanation of the methodology with appropriate reasoning for most decisions made.
+
+Clear and mostly detailed description of implementation steps, demonstrating a solid understanding of the function implementation.
+
+18pt C
+
+Sufficient explanation of the logic for each function, with some minor gaps or lack of detail.
+
+Methodology is described but lacks clarity or depth in some areas; reasoning is partially justified.
+
+Adequate explanation of implementation, but with some minor gaps or lack of technical detail.
+
+12pt P
+
+Basic explanation of the logic, with limited depth, but overall understanding is evident.
+
+Basic methodology is described, but there is little justification or reflection on choices made.
+
+Basic implementation steps are mentioned but lack clarity or thoroughness.
+
+6pt F
+
+Fails to explain the logic or presents a disorganized, unclear understanding of how the main functions work.
+
+No clear explanation of methodology, or the methodology provided is inadequate or poorly justified.
+
+The implementation is poorly explained, with little to no detail on how the functions were implemented.
+
+
+III. e-Poster
+
+(Subject to student's contribution and performance)
+
+
+5pt HD
+
+e-Poster is highly engaging, visually appealing, and effectively communicates key project details with professional design.
+
+4pt D
+
+e-Poster is well-designed and communicates key details effectively, with minor design or content issues.
+
+3pt C
+
+e-Poster is functional and communicates key details, though design or content may be somewhat lacking.
+
+2pt P
+
+e-Poster is basic with noticeable design or content issues that affect communication of project details.
+
+1pt F
+
+e-Poster is poorly designed or lacks key details, making it ineffective for communicating project information.
+
+
+IV. Demonstration video
+
+(Subject to student's contribution and performance)
+
+5pt HD
+
+Video is professional, well-edited, and effectively showcases the project, with clear narration and engaging presentation.
+
+4pt D
+
+Video is well-edited and showcases the project effectively, with minor issues in narration or presentation.
+
+3pt C
+
+Video demonstrates the project adequately, though with some issues in editing, narration, or presentation.
+
+2pt P
+
+Video is basic, with significant issues in editing, narration, or presentation affecting the showcase.
+
+1pt F
+
+Video is poorly edited or ineffective, with major issues in showcasing the project or clear narration.
+
+
+V. Team evaluation form
+
+(Subject to student's contribution and performance)
+
+1 to 5pt
+
+Your teammates assign (average) 1 to 5 to you.

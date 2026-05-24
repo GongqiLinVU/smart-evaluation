@@ -1,0 +1,60 @@
+Progress Report (10pt)
+
+----
+
+Clarity and Consistency of the Progress Diary
+
++
+
+Demonstration of 80% Project Completion
+
+(Subject to student's contribution and performance)
+
+
+
+
+10pt HD
+
+Consistently updated after every team meeting; all entries are detailed and comprehensive, showing continuous work and progress.
+
+Diary is exceptionally well-organized, clear, and easy to follow; structured with detailed descriptions of tasks and team contributions.
+
+The project demonstrates at least 80% completion with exceptional progress and development. All key functionalities are fully operational. The work exceeds expectations, showcasing innovation, thorough testing, and attention to detail. Minimal errors are present, and the project shows a strong potential for further development or real-world application.
+
+8pt D
+
+Regularly updated after most meetings; entries provide clear details about progress and work.
+
+Diary is well-organized with clear descriptions of tasks and team contributions, though slightly less detailed.
+
+The project demonstrates 80% completion with significant progress and well-developed functionality. Most key components work as expected, with minor issues. The work is of a high standard, with clear evidence of problem-solving and effective design decisions, but lacks some polish or refinement compared to HD.
+
+
+6pt C
+
+Updated after most meetings, but some entries lack detail or consistency in tracking progress.
+
+Diary is organized but lacks consistency in clarity and depth; some tasks and contributions are vague.
+
+The project shows moderate progress towards 80% completion. Key features are present but may not function smoothly or as expected. There is evidence of basic testing and debugging, but some aspects require further attention or development. Overall, it meets the fundamental requirements.
+
+4pt P
+
+
+Updated sporadically; entries lack sufficient detail and do not consistently reflect team meetings or work.
+
+Diary is poorly organized with minimal clarity; tasks and contributions are poorly described.
+
+The project approaches 80% completion but demonstrates limited progress. Some key features are incomplete or lack functionality. Errors or flaws may be present, and testing or debugging is insufficient. Basic requirements are met, but further work is necessary to achieve higher standards.
+
+2pt F
+
+Few or no entries; project progress is not documented or shows minimal effort.
+
+Diary is unorganized, unclear, and lacks meaningful content or structure.
+
+The project does not demonstrate sufficient progress toward 80% completion. Key features are missing or non-functional. The work lacks coherence, and significant development is required. The project does not meet the minimum requirements for a passing grade.
+
+
+
+
