@@ -59,6 +59,13 @@ public class LlmConfigController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/duplicate")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TUTOR')")
+    public ResponseEntity<LlmConfigResponse> duplicate(@PathVariable Long id) {
+        LlmConfig copy = llmConfigService.duplicate(id);
+        return ResponseEntity.status(HttpStatus.CREATED).body(LlmConfigResponse.fromEntity(copy));
+    }
+
     @PostMapping("/{id}/preview")
     @PreAuthorize("hasAnyRole('ADMIN', 'TUTOR')")
     public ResponseEntity<PromptPreviewResponse> preview(@PathVariable Long id,

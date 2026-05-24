@@ -23,6 +23,7 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
+  CopyOutlined,
   EyeOutlined,
   RobotOutlined,
   ThunderboltOutlined,
@@ -33,6 +34,7 @@ import {
   createLlmConfig,
   updateLlmConfig,
   deleteLlmConfig,
+  duplicateLlmConfig,
   previewLlmPrompt,
   listRulePackages,
 } from '../api/client';
@@ -123,6 +125,16 @@ export default function LlmConfigPage() {
     }
   };
 
+  const handleDuplicate = async (id: number) => {
+    try {
+      const copy = await duplicateLlmConfig(id);
+      message.success(`Created "${copy.name}"`);
+      fetchData();
+    } catch (err: any) {
+      message.error(err.response?.data?.message || 'Duplicate failed');
+    }
+  };
+
   const handlePreview = async () => {
     if (!previewConfigId || !previewPkgId) {
       message.warning('Select a config and rule package to preview');
@@ -181,6 +193,7 @@ export default function LlmConfigPage() {
       render: (_: any, record: LlmConfigResponse) => (
         <Space>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)} />
+          <Button size="small" icon={<CopyOutlined />} onClick={() => handleDuplicate(record.id)} title="Duplicate" />
           <Popconfirm title="Delete this config?" onConfirm={() => handleDelete(record.id)}>
             <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>

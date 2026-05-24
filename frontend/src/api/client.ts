@@ -610,6 +610,11 @@ export async function deleteLlmConfig(id: number): Promise<void> {
   await api.delete(`/llm-config/${id}`);
 }
 
+export async function duplicateLlmConfig(id: number): Promise<LlmConfigResponse> {
+  const { data } = await api.post<LlmConfigResponse>(`/llm-config/${id}/duplicate`);
+  return data;
+}
+
 export async function previewLlmPrompt(
   configId: number,
   rulePackageId: number,

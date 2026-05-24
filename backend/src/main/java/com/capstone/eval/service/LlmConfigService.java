@@ -85,6 +85,23 @@ public class LlmConfigService {
         llmConfigRepository.deleteById(id);
     }
 
+    @Transactional
+    public LlmConfig duplicate(Long id) {
+        LlmConfig source = getById(id);
+        LlmConfig copy = LlmConfig.builder()
+                .name(source.getName() + " (Copy)")
+                .systemPromptTemplate(source.getSystemPromptTemplate())
+                .additionalContext(source.getAdditionalContext())
+                .outputFormatTemplate(source.getOutputFormatTemplate())
+                .temperature(source.getTemperature())
+                .maxTokens(source.getMaxTokens())
+                .provider(source.getProvider())
+                .model(source.getModel())
+                .isDefault(false)
+                .build();
+        return llmConfigRepository.save(copy);
+    }
+
     @Transactional(readOnly = true)
     public PromptPreviewResponse previewPrompt(Long configId, Long rulePackageId) {
         LlmConfig config = getById(configId);
