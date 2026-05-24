@@ -1,8 +1,10 @@
 package com.capstone.eval.config;
 
+import com.capstone.eval.model.LlmConfig;
 import com.capstone.eval.model.Rule;
 import com.capstone.eval.model.RulePackage;
 import com.capstone.eval.model.RulePackageItem;
+import com.capstone.eval.repository.LlmConfigRepository;
 import com.capstone.eval.repository.RulePackageRepository;
 import com.capstone.eval.repository.RuleRepository;
 import com.capstone.eval.service.RuleService;
@@ -23,6 +25,7 @@ public class RuleDataSeeder implements ApplicationRunner {
     private final RuleService ruleService;
     private final RulePackageRepository rulePackageRepository;
     private final RuleRepository ruleRepository;
+    private final LlmConfigRepository llmConfigRepository;
 
     @Override
     @Transactional
@@ -32,6 +35,7 @@ public class RuleDataSeeder implements ApplicationRunner {
         log.info("Built-in rules seeded.");
 
         seedDefaultRulePackage();
+        seedDefaultLlmConfig();
     }
 
     private void seedDefaultRulePackage() {
@@ -75,5 +79,22 @@ public class RuleDataSeeder implements ApplicationRunner {
 
         rulePackageRepository.save(saved);
         log.info("Default rule package '{}' seeded with {} rules.", saved.getName(), builtInRules.size());
+    }
+
+    private void seedDefaultLlmConfig() {
+        if (llmConfigRepository.findByIsDefaultTrue().isPresent()) {
+            log.info("Default LLM config already exists, skipping seed.");
+            return;
+        }
+
+        LlmConfig defaultConfig = LlmConfig.builder()
+                .name("Default")
+                .temperature(0.1)
+                .maxTokens(4096)
+                .isDefault(true)
+                .build();
+
+        llmConfigRepository.save(defaultConfig);
+        log.info("Default LLM config seeded (uses built-in template, system provider).");
     }
 }
