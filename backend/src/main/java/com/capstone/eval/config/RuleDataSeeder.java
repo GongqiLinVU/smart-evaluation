@@ -82,19 +82,96 @@ public class RuleDataSeeder implements ApplicationRunner {
     }
 
     private void seedDefaultLlmConfig() {
-        if (llmConfigRepository.findByIsDefaultTrue().isPresent()) {
-            log.info("Default LLM config already exists, skipping seed.");
+        var existing = llmConfigRepository.findByIsDefaultTrue().orElse(null);
+        if (existing != null) {
+            if (existing.getSystemPromptTemplate() == null) {
+                existing.setSystemPromptTemplate(DEFAULT_SYSTEM_PROMPT_TEMPLATE);
+                existing.setOutputFormatTemplate(DEFAULT_OUTPUT_FORMAT_TEMPLATE);
+                if (existing.getProvider() == null) {
+                    existing.setProvider("deepseek");
+                }
+                llmConfigRepository.save(existing);
+                log.info("Backfilled default LLM config with sample template.");
+            } else {
+                log.info("Default LLM config already exists, skipping seed.");
+            }
             return;
         }
 
         LlmConfig defaultConfig = LlmConfig.builder()
                 .name("Default")
+                .systemPromptTemplate(DEFAULT_SYSTEM_PROMPT_TEMPLATE)
+                .outputFormatTemplate(DEFAULT_OUTPUT_FORMAT_TEMPLATE)
                 .temperature(0.1)
                 .maxTokens(4096)
+                .provider("deepseek")
                 .isDefault(true)
                 .build();
 
         llmConfigRepository.save(defaultConfig);
-        log.info("Default LLM config seeded (uses built-in template, system provider).");
+        log.info("Default LLM config seeded with sample template (provider=deepseek).");
     }
+
+    private static final String DEFAULT_SYSTEM_PROMPT_TEMPLATE = """
+            You are an experienced IT capstone project assessor. Your task is to evaluate \
+            a student's final project report based on a specific rubric. You must be fair, \
+            consistent, and evidence-based in your assessment.
+
+            ## Rubric
+
+            The report is evaluated on the following criteria. Each criterion is scored at one of \
+            five performance levels:
+
+            | Level       | Points | Description                          |
+            |-------------|--------|--------------------------------------|
+            | EXCELLENT   | 30     | Outstanding, comprehensive work      |
+            | PROFICIENT  | 24     | Solid, thorough work with minor gaps |
+            | COMPETENT   | 18     | Adequate work with some gaps         |
+            | DEVELOPING  | 12     | Basic work with significant gaps     |
+            | INADEQUATE  | 6      | Poor or missing work                 |
+
+            {{criteria_block}}
+
+            ## Scoring Rules
+            - You MUST pick one of the five valid score values: 30, 24, 18, 12, or 6 for each criterion.
+            - Provide specific evidence from the document to justify each score.
+            - For each evidence item, reference the specific section where you found it.
+            - Be objective and base your assessment only on what is written in the document.
+            - Provide a confidence score (0.0 to 1.0) for each criterion indicating how certain you are.
+
+            {{additional_context}}
+
+            ## Output Format
+            {{output_format}}
+            """;
+
+    private static final String DEFAULT_OUTPUT_FORMAT_TEMPLATE = """
+            You MUST respond with ONLY a JSON object in the following format (no markdown fencing, \
+            no additional text before or after):
+            {
+              "overall_score": <integer: average of criterion scores, rounded to nearest valid level>,
+              "overall_level": "<EXCELLENT|PROFICIENT|COMPETENT|DEVELOPING|INADEQUATE>",
+              "criteria": {
+                "<criterion_rule_key>": {
+                  "score": <6|12|18|24|30>,
+                  "level": "<EXCELLENT|PROFICIENT|COMPETENT|DEVELOPING|INADEQUATE>",
+                  "confidence": <0.0 to 1.0>,
+                  "justification": "<2-4 sentences explaining the score>",
+                  "evidence": [
+                    {
+                      "sectionName": "<name of the section where evidence was found>",
+                      "sectionIndex": <0-based index of the section>,
+                      "quote": "<direct quote or key point from the document>",
+                      "sentiment": "<positive|negative>",
+                      "note": "<brief explanation of why this evidence matters>"
+                    }
+                  ],
+                  "suggestions": ["<actionable improvement suggestion tied to a specific section>"]
+                }
+              },
+              "strengths": ["<strength 1>", "<strength 2>"],
+              "improvements": ["<improvement 1>", "<improvement 2>"],
+              "overall_feedback": "<2-4 sentence summary of the overall assessment>"
+            }
+            """;
 }
