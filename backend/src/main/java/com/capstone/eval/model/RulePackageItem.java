@@ -31,4 +31,14 @@ public class RulePackageItem {
     @Column(nullable = false)
     @Builder.Default
     private Double weight = 1.0;
+
+    private Integer maxPoints;
+
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String evidenceQuestions;
+
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String scoringRules;
 }

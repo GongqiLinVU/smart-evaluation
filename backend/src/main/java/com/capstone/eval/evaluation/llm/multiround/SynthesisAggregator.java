@@ -19,9 +19,10 @@ import java.util.stream.Collectors;
 public class SynthesisAggregator {
 
     private final RoundExecutor roundExecutor;
+    private final DynamicPromptBuilder dynamicPromptBuilder;
     private final ObjectMapper objectMapper;
 
-    private static final int[] VALID_SCORES = {6, 12, 18, 24, 30};
+    private static final int[] DEFAULT_VALID_SCORES = {6, 12, 18, 24, 30};
 
     public EvaluationResult synthesize(
             List<RoundOutput> roundOutputs,
@@ -30,15 +31,26 @@ public class SynthesisAggregator {
             List<RulePackageItem> enabledRules,
             EvaluationPlan plan
     ) {
+        return synthesize(roundOutputs, synthesisOutput, submission, enabledRules, plan, null);
+    }
+
+    public EvaluationResult synthesize(
+            List<RoundOutput> roundOutputs,
+            RoundOutput synthesisOutput,
+            Submission submission,
+            List<RulePackageItem> enabledRules,
+            EvaluationPlan plan,
+            RulePackage rulePackage
+    ) {
         RoundOutput finalOutput = (synthesisOutput != null && synthesisOutput.success())
                 ? synthesisOutput
                 : getBestAvailableOutput(roundOutputs);
 
         if (finalOutput == null || !finalOutput.success()) {
-            return buildFallbackResult(roundOutputs, submission, enabledRules);
+            return buildFallbackResult(roundOutputs, submission, enabledRules, rulePackage);
         }
 
-        return parseOutputToResult(finalOutput, submission, enabledRules);
+        return parseOutputToResult(finalOutput, submission, enabledRules, rulePackage);
     }
 
     public EvaluationResult synthesizeSinglePass(
@@ -46,21 +58,33 @@ public class SynthesisAggregator {
             Submission submission,
             List<RulePackageItem> enabledRules
     ) {
+        return synthesizeSinglePass(output, submission, enabledRules, null);
+    }
+
+    public EvaluationResult synthesizeSinglePass(
+            RoundOutput output,
+            Submission submission,
+            List<RulePackageItem> enabledRules,
+            RulePackage rulePackage
+    ) {
         if (!output.success()) {
-            return buildFallbackResult(List.of(output), submission, enabledRules);
+            return buildFallbackResult(List.of(output), submission, enabledRules, rulePackage);
         }
-        return parseOutputToResult(output, submission, enabledRules);
+        return parseOutputToResult(output, submission, enabledRules, rulePackage);
     }
 
     private EvaluationResult parseOutputToResult(
             RoundOutput output,
             Submission submission,
-            List<RulePackageItem> enabledRules
+            List<RulePackageItem> enabledRules,
+            RulePackage rulePackage
     ) {
         JsonNode root = output.parsedJson();
         if (root == null) {
-            return buildFallbackResult(List.of(output), submission, enabledRules);
+            return buildFallbackResult(List.of(output), submission, enabledRules, rulePackage);
         }
+
+        int[] validScores = resolveValidScores(rulePackage);
 
         Map<String, String> keyToName = enabledRules.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getEnabled()))
@@ -69,6 +93,16 @@ public class SynthesisAggregator {
                         item -> item.getRule().getName(),
                         (a, b) -> a
                 ));
+
+        Map<String, Integer> keyToMaxPoints = enabledRules.stream()
+                .filter(item -> Boolean.TRUE.equals(item.getEnabled()) && item.getMaxPoints() != null)
+                .collect(Collectors.toMap(
+                        item -> item.getRule().getRuleKey(),
+                        RulePackageItem::getMaxPoints,
+                        (a, b) -> a
+                ));
+
+        int midScore = validScores[validScores.length / 2];
 
         List<CriterionScore> criterionScores = new ArrayList<>();
         JsonNode criteriaNode = root.get("criteria");
@@ -80,17 +114,25 @@ public class SynthesisAggregator {
                 JsonNode criterionNode = entry.getValue();
 
                 String name = keyToName.getOrDefault(ruleKey, ruleKey);
-                int score = snapToValidScore(getInt(criterionNode, "score", 18));
-                String level = getString(criterionNode, "level", "COMPETENT");
+                Integer criterionMax = keyToMaxPoints.get(ruleKey);
+                int rawScore = getInt(criterionNode, "score", criterionMax != null ? criterionMax / 2 : midScore);
+                int score = criterionMax != null
+                        ? Math.max(0, Math.min(rawScore, criterionMax))
+                        : snapToValidScore(rawScore, validScores);
+                String level = getString(criterionNode, "level", "");
                 String justification = getString(criterionNode, "justification", "");
                 Double confidence = getDouble(criterionNode, "confidence");
                 String evidence = serializeNode(criterionNode.get("evidence"));
                 String suggestions = serializeNode(criterionNode.get("suggestions"));
 
+                PerformanceLevel parsedLevel = level.isBlank()
+                        ? PerformanceLevel.fromPoints(score, validScores)
+                        : parseLevel(level, validScores);
+
                 CriterionScore cs = CriterionScore.builder()
                         .criterionName(name)
                         .score(score)
-                        .level(parseLevel(level))
+                        .level(parsedLevel)
                         .justification(justification)
                         .confidence(confidence)
                         .evidence(evidence)
@@ -100,27 +142,40 @@ public class SynthesisAggregator {
             }
         }
 
-        int overallScore = snapToValidScore(getInt(root, "overall_score",
-                computeAverageScore(criterionScores)));
-        String overallLevel = getString(root, "overall_level", "COMPETENT");
+        int computedOverall = computeAverageScore(criterionScores, rulePackage);
+        int llmOverall = getInt(root, "overall_score", -1);
+        if (llmOverall >= 0 && llmOverall != computedOverall) {
+            log.warn("LLM overall_score={} differs from computed average={}. Using computed value.",
+                    llmOverall, computedOverall);
+        }
+        int overallScore = computedOverall;
+        String overallLevel = getString(root, "overall_level", "");
         String overallFeedback = getString(root, "overall_feedback", "");
         String strengths = serializeNode(root.get("strengths"));
         String improvements = serializeNode(root.get("improvements"));
+
+        PerformanceLevel parsedOverallLevel = overallLevel.isBlank()
+                ? PerformanceLevel.fromPoints(overallScore, validScores)
+                : parseLevel(overallLevel, validScores);
 
         double avgConfidence = criterionScores.stream()
                 .filter(cs -> cs.getConfidence() != null)
                 .mapToDouble(CriterionScore::getConfidence)
                 .average().orElse(0.0);
 
+        int totalMaxScore = computeTotalMaxScore(rulePackage);
+        int maxScoreValue = totalMaxScore > 0 ? totalMaxScore : validScores[validScores.length - 1];
+
         EvaluationResult result = EvaluationResult.builder()
                 .submission(submission)
                 .method(EvaluationMethod.LLM)
                 .overallScore(overallScore)
-                .overallLevel(parseLevel(overallLevel))
+                .overallLevel(parsedOverallLevel)
                 .overallFeedback(overallFeedback)
                 .strengths(strengths)
                 .improvements(improvements)
                 .confidence(avgConfidence)
+                .maxScore(maxScoreValue)
                 .rawLlmResponse(output.rawResponse())
                 .evaluatedAt(LocalDateTime.now())
                 .criterionScores(new ArrayList<>())
@@ -138,9 +193,13 @@ public class SynthesisAggregator {
     private EvaluationResult buildFallbackResult(
             List<RoundOutput> outputs,
             Submission submission,
-            List<RulePackageItem> enabledRules
+            List<RulePackageItem> enabledRules,
+            RulePackage rulePackage
     ) {
         log.warn("Building fallback result from partial round outputs");
+
+        int[] validScores = resolveValidScores(rulePackage);
+        int midScore = validScores[validScores.length / 2];
 
         Map<String, List<Integer>> scoresByKey = new HashMap<>();
         for (RoundOutput output : outputs) {
@@ -168,28 +227,31 @@ public class SynthesisAggregator {
         List<CriterionScore> criterionScores = new ArrayList<>();
         for (var entry : keyToName.entrySet()) {
             List<Integer> scores = scoresByKey.getOrDefault(entry.getKey(), Collections.emptyList());
-            int avgScore = scores.isEmpty() ? 18 :
-                    snapToValidScore((int) Math.round(scores.stream().mapToInt(i -> i).average().orElse(18)));
+            int avgScore = scores.isEmpty() ? midScore :
+                    snapToValidScore((int) Math.round(scores.stream().mapToInt(i -> i).average().orElse(midScore)), validScores);
 
             CriterionScore cs = CriterionScore.builder()
                     .criterionName(entry.getValue())
                     .score(avgScore)
-                    .level(PerformanceLevel.fromPoints(avgScore))
+                    .level(PerformanceLevel.fromPoints(avgScore, validScores))
                     .justification("Score derived from partial round results (synthesis failed)")
                     .confidence(0.5)
                     .build();
             criterionScores.add(cs);
         }
 
-        int overallScore = computeAverageScore(criterionScores);
+        int overallScore = computeAverageScore(criterionScores, rulePackage);
+        int totalMaxScore = computeTotalMaxScore(rulePackage);
+        int maxScoreValue = totalMaxScore > 0 ? totalMaxScore : validScores[validScores.length - 1];
 
         EvaluationResult result = EvaluationResult.builder()
                 .submission(submission)
                 .method(EvaluationMethod.LLM)
                 .overallScore(overallScore)
-                .overallLevel(PerformanceLevel.fromPoints(overallScore))
+                .overallLevel(PerformanceLevel.fromPoints(overallScore, validScores))
                 .overallFeedback("Evaluation completed with partial results due to synthesis failure.")
                 .confidence(0.5)
+                .maxScore(maxScoreValue)
                 .rawLlmResponse(outputs.stream()
                         .filter(RoundOutput::success)
                         .map(RoundOutput::rawResponse)
@@ -215,15 +277,49 @@ public class SynthesisAggregator {
     }
 
     private int computeAverageScore(List<CriterionScore> scores) {
-        if (scores.isEmpty()) return 18;
-        double avg = scores.stream().mapToInt(CriterionScore::getScore).average().orElse(18);
-        return snapToValidScore((int) Math.round(avg));
+        return computeAverageScore(scores, null);
     }
 
-    private int snapToValidScore(int raw) {
-        int closest = VALID_SCORES[0];
+    private int computeAverageScore(List<CriterionScore> scores, RulePackage rulePackage) {
+        int[] validScores = resolveValidScores(rulePackage);
+        int midScore = validScores[validScores.length / 2];
+        if (scores.isEmpty()) return midScore;
+        // If per-criterion maxPoints is set on the items, sum raw scores directly.
+        // The criteria list won't have maxPoints on the CriterionScore itself, so we
+        // use a plain sum only when the rulePackage items indicate a fixed-mark rubric.
+        if (isFixedMarkRubric(rulePackage)) {
+            return scores.stream().mapToInt(CriterionScore::getScore).sum();
+        }
+        double avg = scores.stream().mapToInt(CriterionScore::getScore).average().orElse(midScore);
+        return snapToValidScore((int) Math.round(avg), validScores);
+    }
+
+    private boolean isFixedMarkRubric(RulePackage rulePackage) {
+        if (rulePackage == null || rulePackage.getItems() == null) return false;
+        return rulePackage.getItems().stream()
+                .anyMatch(item -> Boolean.TRUE.equals(item.getEnabled()) && item.getMaxPoints() != null);
+    }
+
+    int computeTotalMaxScore(RulePackage rulePackage) {
+        if (!isFixedMarkRubric(rulePackage)) return -1;
+        return rulePackage.getItems().stream()
+                .filter(item -> Boolean.TRUE.equals(item.getEnabled()) && item.getMaxPoints() != null)
+                .mapToInt(RulePackageItem::getMaxPoints)
+                .sum();
+    }
+
+    private int[] resolveValidScores(RulePackage rulePackage) {
+        if (rulePackage != null) {
+            int[] scores = dynamicPromptBuilder.getValidScores(rulePackage);
+            if (scores.length > 0) return scores;
+        }
+        return DEFAULT_VALID_SCORES;
+    }
+
+    private int snapToValidScore(int raw, int[] validScores) {
+        int closest = validScores[0];
         int minDist = Math.abs(raw - closest);
-        for (int valid : VALID_SCORES) {
+        for (int valid : validScores) {
             int dist = Math.abs(raw - valid);
             if (dist < minDist) {
                 minDist = dist;
@@ -234,10 +330,19 @@ public class SynthesisAggregator {
     }
 
     private PerformanceLevel parseLevel(String level) {
+        return parseLevel(level, null);
+    }
+
+    private PerformanceLevel parseLevel(String level, int[] validScores) {
+        if (level == null || level.isBlank()) {
+            return (validScores != null && validScores.length > 0 && validScores[validScores.length - 1] <= 10)
+                    ? PerformanceLevel.C : PerformanceLevel.COMPETENT;
+        }
         try {
             return PerformanceLevel.valueOf(level.toUpperCase());
         } catch (Exception e) {
-            return PerformanceLevel.COMPETENT;
+            return (validScores != null && validScores.length > 0 && validScores[validScores.length - 1] <= 10)
+                    ? PerformanceLevel.C : PerformanceLevel.COMPETENT;
         }
     }
 

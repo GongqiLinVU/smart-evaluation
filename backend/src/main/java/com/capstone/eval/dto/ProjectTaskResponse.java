@@ -12,6 +12,8 @@ public record ProjectTaskResponse(
         Integer displayOrder,
         Long rulePackageId,
         String rulePackageName,
+        Long llmConfigId,
+        String llmConfigName,
         LocalDateTime createdAt
 ) {
 
@@ -24,6 +26,8 @@ public record ProjectTaskResponse(
                 task.getDisplayOrder(),
                 task.getRulePackage() != null ? task.getRulePackage().getId() : null,
                 task.getRulePackage() != null ? task.getRulePackage().getName() : null,
+                task.getLlmConfig() != null ? task.getLlmConfig().getId() : null,
+                task.getLlmConfig() != null ? task.getLlmConfig().getName() : null,
                 task.getCreatedAt()
         );
     }

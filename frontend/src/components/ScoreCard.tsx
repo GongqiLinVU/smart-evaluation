@@ -10,6 +10,7 @@ const { Text, Paragraph } = Typography;
 
 interface ScoreCardProps {
   criterion: CriterionScoreResponse;
+  maxScore?: number;
 }
 
 function formatCriterionName(name: string): string {
@@ -19,21 +20,22 @@ function formatCriterionName(name: string): string {
     .join(' ');
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 27) return 'green';
-  if (score >= 21) return 'blue';
-  if (score >= 15) return 'orange';
-  if (score >= 9) return 'gold';
+function getScoreColor(score: number, maxScore = 30): string {
+  const pct = score / maxScore;
+  if (pct >= 0.9) return 'green';
+  if (pct >= 0.7) return 'blue';
+  if (pct >= 0.5) return 'orange';
+  if (pct >= 0.3) return 'gold';
   return 'red';
 }
 
 function getLevelColor(level: string): string {
   const upper = level.toUpperCase();
-  if (upper === 'EXCELLENT') return 'green';
-  if (upper === 'PROFICIENT') return 'blue';
-  if (upper === 'COMPETENT') return 'orange';
-  if (upper === 'DEVELOPING') return 'gold';
-  if (upper === 'INADEQUATE') return 'red';
+  if (upper === 'EXCELLENT' || upper === 'HD') return 'green';
+  if (upper === 'PROFICIENT' || upper === 'D') return 'blue';
+  if (upper === 'COMPETENT' || upper === 'C') return 'orange';
+  if (upper === 'DEVELOPING' || upper === 'P') return 'gold';
+  if (upper === 'INADEQUATE' || upper === 'F') return 'red';
   return 'default';
 }
 
@@ -41,7 +43,7 @@ function isEvidenceItem(item: string | EvidenceItem): item is EvidenceItem {
   return typeof item === 'object' && item !== null && 'quote' in item;
 }
 
-export default function ScoreCard({ criterion }: ScoreCardProps) {
+export default function ScoreCard({ criterion, maxScore = 30 }: ScoreCardProps) {
   const subScoreEntries = Object.entries(criterion.subScores || {});
   const subScoreColumns = [
     {
@@ -171,7 +173,7 @@ export default function ScoreCard({ criterion }: ScoreCardProps) {
       title={
         <span>
           {formatCriterionName(criterion.criterionName)}{' '}
-          <Tag color={getScoreColor(criterion.score)}>{criterion.score}</Tag>
+          <Tag color={getScoreColor(criterion.score, maxScore)}>{criterion.score}</Tag>
           <Tag color={getLevelColor(criterion.level)}>{criterion.level}</Tag>
         </span>
       }
@@ -179,9 +181,9 @@ export default function ScoreCard({ criterion }: ScoreCardProps) {
     >
       <div style={{ marginBottom: 16 }}>
         <Progress
-          percent={Math.round((criterion.score / 30) * 100)}
-          strokeColor={getScoreColor(criterion.score)}
-          format={() => `${criterion.score}/30`}
+          percent={Math.round((criterion.score / maxScore) * 100)}
+          strokeColor={getScoreColor(criterion.score, maxScore)}
+          format={() => `${criterion.score}/${maxScore}`}
         />
       </div>
       {criterion.confidence != null && (

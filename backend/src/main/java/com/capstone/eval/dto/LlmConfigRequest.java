@@ -11,5 +11,6 @@ public record LlmConfigRequest(
         Integer maxTokens,
         String provider,
         String model,
+        Boolean multimodal,
         Boolean isDefault
 ) {}

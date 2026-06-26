@@ -38,9 +38,10 @@ import {
   updateProjectTask,
   deleteProjectTask,
   listRulePackages,
+  listLlmConfigs,
 } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import type { ProjectResponse, ProjectMemberResponse, UserResponse, ProjectTaskResponse, RulePackageResponse } from '../types';
+import type { ProjectResponse, ProjectMemberResponse, UserResponse, ProjectTaskResponse, RulePackageResponse, LlmConfigResponse } from '../types';
 
 const { Title } = Typography;
 
@@ -70,6 +71,7 @@ export default function ProjectsPage() {
   const [editingTask, setEditingTask] = useState<ProjectTaskResponse | null>(null);
   const [taskForm] = Form.useForm();
   const [rulePackages, setRulePackages] = useState<RulePackageResponse[]>([]);
+  const [llmConfigs, setLlmConfigs] = useState<LlmConfigResponse[]>([]);
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -86,6 +88,7 @@ export default function ProjectsPage() {
   useEffect(() => {
     fetchProjects();
     listRulePackages().then(setRulePackages).catch(() => {});
+    listLlmConfigs().then(setLlmConfigs).catch(() => {});
   }, []);
 
   const handleCreateOrUpdate = async (values: {
@@ -220,6 +223,7 @@ export default function ProjectsPage() {
       description: task.description,
       displayOrder: task.displayOrder,
       rulePackageId: task.rulePackageId,
+      llmConfigId: task.llmConfigId,
     });
     setTaskModalOpen(true);
   };
@@ -229,6 +233,7 @@ export default function ProjectsPage() {
     description?: string;
     displayOrder?: number;
     rulePackageId?: number;
+    llmConfigId?: number;
   }) => {
     if (!tasksProject) return;
     try {
@@ -528,7 +533,7 @@ export default function ProjectsPage() {
         open={tasksModalOpen}
         onCancel={() => setTasksModalOpen(false)}
         footer={null}
-        width={700}
+        width={950}
       >
         <div style={{ marginBottom: 16 }}>
           <Button icon={<PlusOutlined />} onClick={openCreateTask}>
@@ -561,6 +566,13 @@ export default function ProjectsPage() {
                 key: 'rulePackageName',
                 render: (name: string | null) =>
                   name ? <Tag color="geekblue">{name}</Tag> : <Tag>Inherit</Tag>,
+              },
+              {
+                title: 'LLM Config',
+                dataIndex: 'llmConfigName',
+                key: 'llmConfigName',
+                render: (name: string | null) =>
+                  name ? <Tag color="purple">{name}</Tag> : <Tag>Default</Tag>,
               },
               {
                 title: 'Actions',
@@ -620,6 +632,16 @@ export default function ProjectsPage() {
               options={rulePackages.map((rp) => ({
                 label: `${rp.name}${rp.isDefault ? ' (Default)' : ''}`,
                 value: rp.id,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="llmConfigId" label="LLM Config" extra="Which LLM prompt config to use when running LLM evaluation for this task">
+            <Select
+              placeholder="Use default LLM config"
+              allowClear
+              options={llmConfigs.map((c) => ({
+                label: `${c.name}${c.isDefault ? ' (Default)' : ''}`,
+                value: c.id,
               }))}
             />
           </Form.Item>

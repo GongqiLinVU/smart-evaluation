@@ -10,4 +10,6 @@ import java.util.List;
 public interface EvaluationRoundRepository extends JpaRepository<EvaluationRound, Long> {
 
     List<EvaluationRound> findByEvaluationResultIdOrderByRoundNumberAsc(Long evaluationResultId);
+
+    void deleteByEvaluationResultId(Long evaluationResultId);
 }

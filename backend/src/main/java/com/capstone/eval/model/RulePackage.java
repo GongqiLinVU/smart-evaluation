@@ -51,6 +51,10 @@ public class RulePackage {
     @Builder.Default
     private Boolean implementationEnabled = true;
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String scoringScale;
+
     @OneToMany(mappedBy = "rulePackage", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<RulePackageItem> items = new ArrayList<>();

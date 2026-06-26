@@ -108,6 +108,107 @@ public class RuleService {
         }
     }
 
+    @Transactional
+    public void seedProgressReportRules() {
+        seedIfAbsent("meeting_diary", "Meeting Diary Consistency",
+                "Evaluates regularity and detail of meeting diary entries — whether updated after every team meeting, " +
+                        "with detailed descriptions of tasks performed and team contributions",
+                "Diary",
+                MEETING_DIARY_PROMPT);
+        seedIfAbsent("progress_organization", "Progress Diary Organization",
+                "Evaluates how well-organized, clear, and structured the diary is — task descriptions, " +
+                        "team contributions, and logical flow of the progress narrative",
+                "Diary",
+                PROGRESS_ORGANIZATION_PROMPT);
+        seedIfAbsent("completion_demo", "80% Completion Demonstration",
+                "Evaluates whether the project demonstrates at least 80% completion — features stated as requirements, " +
+                        "working functionality shown, results presented with mandatory textual explanation " +
+                        "(screenshots alone are insufficient)",
+                "Demo",
+                COMPLETION_DEMO_PROMPT);
+    }
+
+    private static final String MEETING_DIARY_PROMPT = """
+            ### Meeting Diary Consistency
+            How consistently and thoroughly does the student maintain their progress diary after team meetings?
+
+            - HD (10): Consistently updated after every team meeting; all entries are detailed \
+            and comprehensive, showing continuous work and progress. Each entry clearly records \
+            date, attendees, discussion points, and individual action items.
+            - D (8): Regularly updated after most meetings; entries provide clear details about \
+            progress and work. Occasional meetings may lack an entry but the overall record \
+            is strong.
+            - C (6): Updated after most meetings, but some entries lack detail or consistency \
+            in tracking progress. Gaps in the record are noticeable.
+            - P (4): Updated sporadically; entries lack sufficient detail and do not consistently \
+            reflect team meetings or work done between sessions.
+            - F (2): Few or no entries; project progress is not documented or shows minimal effort. \
+            The diary is essentially empty or unusable as a progress record.
+            """;
+
+    private static final String PROGRESS_ORGANIZATION_PROMPT = """
+            ### Progress Diary Organization
+            How well-organized, clear, and structured is the progress diary?
+
+            - HD (10): Diary is exceptionally well-organized, clear, and easy to follow. \
+            Structured with detailed descriptions of tasks, team contributions, and \
+            milestones. Each entry has a logical flow and connects to previous entries.
+            - D (8): Diary is well-organized with clear descriptions of tasks and team \
+            contributions, though slightly less detailed. Structure is consistent \
+            and navigation is straightforward.
+            - C (6): Diary is organized but lacks consistency in clarity and depth. \
+            Some tasks and contributions are vague or poorly categorized. \
+            Structure exists but is uneven.
+            - P (4): Diary is poorly organized with minimal clarity. Tasks and \
+            contributions are poorly described. No consistent structure or format \
+            between entries.
+            - F (2): Diary is unorganized, unclear, and lacks meaningful content or \
+            structure. Entries (if any) are incoherent or unstructured.
+            """;
+
+    private static final String COMPLETION_DEMO_PROMPT = """
+            ### 80% Completion Demonstration
+            Does the submission demonstrate at least 80% project completion with clear evidence \
+            of working features?
+
+            Evaluation criteria:
+            1. REQUIREMENTS: Are the planned features/requirements clearly stated so the reader \
+            knows what "100%" means?
+            2. FUNCTIONALITY: Is there evidence that key features are operational (not just \
+            planned or in-progress)?
+            3. RESULTS WITH EXPLANATION: Are results shown (screenshots, outputs, logs) AND \
+            accompanied by textual explanation of what is being demonstrated and how it \
+            proves the feature works? Screenshots without explanation underneath are \
+            NOT sufficient and should be penalized.
+            4. SCOPE COVERAGE: Does the demonstrated work cover ~80% of the stated requirements?
+
+            Scoring:
+            - HD (10): Project demonstrates at least 80% completion with exceptional progress. \
+            All key functionalities are fully operational. Results are shown with clear, \
+            detailed explanation of what each screenshot/output demonstrates. The work \
+            exceeds expectations, showing innovation, thorough testing, and attention to \
+            detail. Requirements are explicitly stated and mapped to demonstrated features.
+            - D (8): Project demonstrates 80% completion with significant progress. Most key \
+            components work as expected with minor issues. Results are shown with adequate \
+            explanation. Evidence of problem-solving and effective design decisions is clear, \
+            but lacks some polish compared to HD.
+            - C (6): Project shows moderate progress towards 80% completion. Key features are \
+            present but may not function smoothly. Results are shown but explanations are \
+            thin or some screenshots lack accompanying text. Meets fundamental requirements \
+            but leaves questions about full functionality.
+            - P (4): Project approaches 80% but demonstrates limited progress. Some features \
+            are incomplete or lack functionality. Results may be shown but with little to \
+            no explanation of what they prove. Requirements are unclear, making it hard \
+            to assess actual completion percentage.
+            - F (2): Project does not demonstrate sufficient progress toward 80% completion. \
+            Key features are missing or non-functional. Results are absent or presented \
+            without any context. The submission does not provide evidence of a working system.
+
+            IMPORTANT: If screenshots or images are present without textual explanation below them, \
+            this MUST be noted as a deficiency. The student must explain what the screenshot shows, \
+            what feature it demonstrates, and what the expected vs actual behavior is.
+            """;
+
     private static final String LOGIC_EXPLANATION_PROMPT = """
             ### Logic Explanation
             How well does the student explain the logic behind the main functions in their project?

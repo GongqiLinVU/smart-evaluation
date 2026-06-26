@@ -27,6 +27,12 @@ public class DocumentSection {
     private int tableCount;
 
     @Builder.Default
+    private List<String> tableContents = new ArrayList<>();
+
+    @Builder.Default
+    private List<String> imageDescriptions = new ArrayList<>();
+
+    @Builder.Default
     private List<String> technicalTerms = new ArrayList<>();
 
     private double technicalVocabularyDensity;

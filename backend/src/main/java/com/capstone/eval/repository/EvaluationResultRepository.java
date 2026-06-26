@@ -18,4 +18,6 @@ public interface EvaluationResultRepository extends JpaRepository<EvaluationResu
     long countBySubmissionIdAndMethod(Long submissionId, EvaluationMethod method);
 
     List<EvaluationResult> findBySubmissionIdAndMethodOrderByEvaluatedAtDesc(Long submissionId, EvaluationMethod method);
+
+    List<EvaluationResult> findBySubmissionIdIn(List<Long> submissionIds);
 }

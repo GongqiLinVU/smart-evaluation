@@ -35,10 +35,14 @@ public class LlmEvaluationEngine implements EvaluationEngine {
 
     @Override
     public EvaluationResult evaluate(ParsedDocument document, Submission submission) {
-        return evaluate(document, submission, null);
+        return evaluate(document, submission, null, null);
     }
 
     public EvaluationResult evaluate(ParsedDocument document, Submission submission, RulePackage rulePackage) {
+        return evaluate(document, submission, rulePackage, null);
+    }
+
+    public EvaluationResult evaluate(ParsedDocument document, Submission submission, RulePackage rulePackage, LlmConfig resolvedConfig) {
         log.info("Starting LLM evaluation for submission id={}", submission.getId());
 
         LlmProvider provider = providerFactory.getDefaultProvider();
@@ -47,7 +51,9 @@ public class LlmEvaluationEngine implements EvaluationEngine {
                     "LLM provider '" + provider.getName() + "' is not configured.");
         }
 
-        LlmConfig config = llmConfigRepository.findByIsDefaultTrue().orElse(null);
+        LlmConfig config = resolvedConfig != null
+                ? resolvedConfig
+                : llmConfigRepository.findByIsDefaultTrue().orElse(null);
 
         List<RulePackageItem> enabledRules = resolveEnabledRules(rulePackage);
 
@@ -60,18 +66,18 @@ public class LlmEvaluationEngine implements EvaluationEngine {
         log.info("Evaluation plan: strategy={}, rounds={}",
                 plan.strategy(), plan.evaluationRounds().size());
 
-        String systemPrompt = dynamicPromptBuilder.buildSystemPrompt(config, enabledRules);
+        String systemPrompt = dynamicPromptBuilder.buildSystemPrompt(config, enabledRules, rulePackage);
 
         EvaluationResult result;
         if (plan.strategy() == PlanStrategy.SINGLE_PASS) {
-            result = executeSinglePass(plan, document, submission, config, enabledRules, systemPrompt);
+            result = executeSinglePass(plan, document, submission, config, enabledRules, systemPrompt, rulePackage);
         } else {
-            result = executeMultiPass(plan, document, submission, config, enabledRules, systemPrompt);
+            result = executeMultiPass(plan, document, submission, config, enabledRules, systemPrompt, rulePackage);
         }
 
         result.setMethod(EvaluationMethod.LLM);
 
-        log.info("LLM evaluation complete for submission id={}: overall={}/30 ({})",
+        log.info("LLM evaluation complete for submission id={}: overall={} ({})",
                 submission.getId(), result.getOverallScore(), result.getOverallLevel());
 
         return result;
@@ -83,7 +89,8 @@ public class LlmEvaluationEngine implements EvaluationEngine {
             Submission submission,
             LlmConfig config,
             List<RulePackageItem> enabledRules,
-            String systemPrompt
+            String systemPrompt,
+            RulePackage rulePackage
     ) {
         RoundSpec roundSpec = plan.evaluationRounds().get(0);
         LocalDateTime startedAt = LocalDateTime.now();
@@ -92,9 +99,9 @@ public class LlmEvaluationEngine implements EvaluationEngine {
                 roundSpec, document, config, enabledRules, systemPrompt);
 
         EvaluationResult result = synthesisAggregator.synthesizeSinglePass(
-                output, submission, enabledRules);
+                output, submission, enabledRules, rulePackage);
 
-        EvaluationRound round = buildRoundRecord(output, roundSpec, startedAt);
+        EvaluationRound round = buildRoundRecord(output, roundSpec, startedAt, systemPrompt, output.userPrompt());
         round.setEvaluationResult(result);
         result.getRounds().add(round);
 
@@ -107,7 +114,8 @@ public class LlmEvaluationEngine implements EvaluationEngine {
             Submission submission,
             LlmConfig config,
             List<RulePackageItem> enabledRules,
-            String systemPrompt
+            String systemPrompt,
+            RulePackage rulePackage
     ) {
         List<LocalDateTime> startTimes = new ArrayList<>();
         List<CompletableFuture<RoundOutput>> futures = new ArrayList<>();
@@ -139,18 +147,19 @@ public class LlmEvaluationEngine implements EvaluationEngine {
         }
 
         EvaluationResult result = synthesisAggregator.synthesize(
-                roundOutputs, synthesisOutput, submission, enabledRules, plan);
+                roundOutputs, synthesisOutput, submission, enabledRules, plan, rulePackage);
 
         for (int i = 0; i < roundOutputs.size(); i++) {
             RoundSpec spec = plan.evaluationRounds().get(i);
-            EvaluationRound round = buildRoundRecord(roundOutputs.get(i), spec, startTimes.get(i));
+            RoundOutput ro = roundOutputs.get(i);
+            EvaluationRound round = buildRoundRecord(ro, spec, startTimes.get(i), systemPrompt, ro.userPrompt());
             round.setEvaluationResult(result);
             result.getRounds().add(round);
         }
 
         if (synthesisOutput != null) {
             EvaluationRound synthRound = buildRoundRecord(
-                    synthesisOutput, plan.synthesisRound(), synthesisStart);
+                    synthesisOutput, plan.synthesisRound(), synthesisStart, systemPrompt, synthesisOutput.userPrompt());
             synthRound.setEvaluationResult(result);
             result.getRounds().add(synthRound);
         }
@@ -185,7 +194,7 @@ public class LlmEvaluationEngine implements EvaluationEngine {
                 .toList();
     }
 
-    private EvaluationRound buildRoundRecord(RoundOutput output, RoundSpec spec, LocalDateTime startedAt) {
+    private EvaluationRound buildRoundRecord(RoundOutput output, RoundSpec spec, LocalDateTime startedAt, String systemPrompt, String userPrompt) {
         String inputSections = null;
         String targetCriteria = null;
         try {
@@ -200,6 +209,8 @@ public class LlmEvaluationEngine implements EvaluationEngine {
                 .roundType(spec.roundType())
                 .inputSections(inputSections)
                 .targetCriteria(targetCriteria)
+                .systemPrompt(systemPrompt)
+                .userPrompt(userPrompt)
                 .rawResponse(output.rawResponse())
                 .promptTokens(output.promptTokens())
                 .completionTokens(output.completionTokens())

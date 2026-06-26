@@ -10,4 +10,6 @@ import java.util.Optional;
 public interface TutorReviewRepository extends JpaRepository<TutorReview, Long> {
 
     Optional<TutorReview> findFirstBySubmissionIdOrderByReviewedAtDesc(Long submissionId);
+
+    void deleteBySubmissionId(Long submissionId);
 }

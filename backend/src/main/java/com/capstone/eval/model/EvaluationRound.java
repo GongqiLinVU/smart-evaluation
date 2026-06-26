@@ -35,6 +35,14 @@ public class EvaluationRound {
 
     @Lob
     @Column(columnDefinition = "TEXT")
+    private String systemPrompt;
+
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String userPrompt;
+
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String rawResponse;
 
     private Integer promptTokens;

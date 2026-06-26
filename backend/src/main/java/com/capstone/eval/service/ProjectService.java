@@ -8,10 +8,20 @@ import com.capstone.eval.model.ProjectTask;
 import com.capstone.eval.model.RulePackage;
 import com.capstone.eval.model.User;
 import com.capstone.eval.model.enums.Role;
+import com.capstone.eval.model.LlmConfig;
+import com.capstone.eval.repository.EvaluationResultRepository;
+import com.capstone.eval.repository.EvaluationRoundRepository;
+import com.capstone.eval.repository.GroupMemberRepository;
+import com.capstone.eval.repository.GroupRepository;
+import com.capstone.eval.repository.LlmConfigRepository;
+import com.capstone.eval.repository.ParsedDocumentRepository;
 import com.capstone.eval.repository.ProjectMemberRepository;
 import com.capstone.eval.repository.ProjectRepository;
 import com.capstone.eval.repository.ProjectTaskRepository;
 import com.capstone.eval.repository.RulePackageRepository;
+import com.capstone.eval.repository.ScoreAdjustmentRepository;
+import com.capstone.eval.repository.SubmissionRepository;
+import com.capstone.eval.repository.TutorReviewRepository;
 import com.capstone.eval.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,7 +37,16 @@ public class ProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final ProjectTaskRepository projectTaskRepository;
     private final RulePackageRepository rulePackageRepository;
+    private final LlmConfigRepository llmConfigRepository;
     private final UserRepository userRepository;
+    private final SubmissionRepository submissionRepository;
+    private final EvaluationResultRepository evaluationResultRepository;
+    private final EvaluationRoundRepository evaluationRoundRepository;
+    private final ScoreAdjustmentRepository scoreAdjustmentRepository;
+    private final TutorReviewRepository tutorReviewRepository;
+    private final ParsedDocumentRepository parsedDocumentRepository;
+    private final GroupMemberRepository groupMemberRepository;
+    private final GroupRepository groupRepository;
 
     public Project createProject(CreateProjectRequest request) {
         return createProject(request, null, null);
@@ -81,7 +100,32 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
+    @Transactional
     public void deleteProject(Long id) {
+        // Delete submission-linked data first (deepest level)
+        var submissions = submissionRepository.findByProjectIdOrderByUploadedAtDesc(id);
+        for (var submission : submissions) {
+            Long sid = submission.getId();
+            var evalResults = evaluationResultRepository.findBySubmissionId(sid);
+            for (var result : evalResults) {
+                evaluationRoundRepository.deleteByEvaluationResultId(result.getId());
+                scoreAdjustmentRepository.deleteByEvaluationId(result.getId());
+            }
+            evaluationResultRepository.deleteAll(evalResults);
+            tutorReviewRepository.deleteBySubmissionId(sid);
+            parsedDocumentRepository.deleteBySubmissionId(sid);
+        }
+        submissionRepository.deleteAll(submissions);
+
+        // Delete groups and their members
+        var groups = groupRepository.findByProjectIdOrderByGroupCodeAsc(id);
+        for (var group : groups) {
+            groupMemberRepository.deleteByGroupId(group.getId());
+        }
+        groupRepository.deleteByProjectId(id);
+
+        projectMemberRepository.deleteByProjectId(id);
+        projectTaskRepository.deleteByProjectId(id);
         projectRepository.deleteById(id);
     }
 
@@ -160,12 +204,19 @@ public class ProjectService {
                     .orElseThrow(() -> new RuntimeException("Rule package not found: " + request.rulePackageId()));
         }
 
+        LlmConfig llmConfig = null;
+        if (request.llmConfigId() != null) {
+            llmConfig = llmConfigRepository.findById(request.llmConfigId())
+                    .orElseThrow(() -> new RuntimeException("LLM config not found: " + request.llmConfigId()));
+        }
+
         ProjectTask task = ProjectTask.builder()
                 .project(project)
                 .name(request.name())
                 .description(request.description())
                 .displayOrder(order)
                 .rulePackage(rulePackage)
+                .llmConfig(llmConfig)
                 .build();
         return projectTaskRepository.save(task);
     }
@@ -184,6 +235,14 @@ public class ProjectService {
             task.setRulePackage(rulePackage);
         } else {
             task.setRulePackage(null);
+        }
+
+        if (request.llmConfigId() != null) {
+            LlmConfig llmConfig = llmConfigRepository.findById(request.llmConfigId())
+                    .orElseThrow(() -> new RuntimeException("LLM config not found: " + request.llmConfigId()));
+            task.setLlmConfig(llmConfig);
+        } else {
+            task.setLlmConfig(null);
         }
 
         return projectTaskRepository.save(task);

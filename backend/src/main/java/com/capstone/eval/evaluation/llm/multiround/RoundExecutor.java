@@ -31,8 +31,9 @@ public class RoundExecutor {
         log.info("Executing round {} ({}) with {} sections",
                 roundSpec.roundNumber(), roundSpec.roundType(), roundSpec.sectionIndices().size());
 
+        String userPrompt = null;
         try {
-            String userPrompt = promptBuilder.buildRoundUserPrompt(document, roundSpec);
+            userPrompt = promptBuilder.buildRoundUserPrompt(document, roundSpec);
 
             LlmProvider provider = resolveProvider(config);
             LlmOptions options = resolveOptions(config);
@@ -49,6 +50,7 @@ public class RoundExecutor {
             return new RoundOutput(
                     roundSpec.roundNumber(),
                     response.content(),
+                    userPrompt,
                     parsed,
                     response.promptTokens(),
                     response.completionTokens(),
@@ -60,6 +62,7 @@ public class RoundExecutor {
             return new RoundOutput(
                     roundSpec.roundNumber(),
                     null,
+                    userPrompt,
                     null,
                     0, 0,
                     false,
@@ -76,8 +79,9 @@ public class RoundExecutor {
     ) {
         log.info("Executing synthesis round from {} prior rounds", priorOutputs.size());
 
+        String synthesisPrompt = null;
         try {
-            String synthesisPrompt = promptBuilder.buildSynthesisPrompt(priorOutputs, enabledRules);
+            synthesisPrompt = promptBuilder.buildSynthesisPrompt(priorOutputs, enabledRules);
 
             LlmProvider provider = resolveProvider(config);
             LlmOptions options = resolveOptions(config);
@@ -97,6 +101,7 @@ public class RoundExecutor {
             return new RoundOutput(
                     roundNumber,
                     response.content(),
+                    synthesisPrompt,
                     parsed,
                     response.promptTokens(),
                     response.completionTokens(),
@@ -107,7 +112,7 @@ public class RoundExecutor {
             log.error("Synthesis round failed: {}", e.getMessage(), e);
             int roundNumber = priorOutputs.stream()
                     .mapToInt(RoundOutput::roundNumber).max().orElse(0) + 1;
-            return new RoundOutput(roundNumber, null, null, 0, 0, false, e.getMessage());
+            return new RoundOutput(roundNumber, null, synthesisPrompt, null, 0, 0, false, e.getMessage());
         }
     }
 

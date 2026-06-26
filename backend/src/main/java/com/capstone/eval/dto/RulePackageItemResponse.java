@@ -9,7 +9,10 @@ public record RulePackageItemResponse(
         String ruleName,
         String ruleCategory,
         Boolean enabled,
-        Double weight
+        Double weight,
+        Integer maxPoints,
+        Boolean hasEvidenceQuestions,
+        Boolean hasScoringRules
 ) {
     public static RulePackageItemResponse fromEntity(RulePackageItem item) {
         return new RulePackageItemResponse(
@@ -19,7 +22,10 @@ public record RulePackageItemResponse(
                 item.getRule().getName(),
                 item.getRule().getCategory(),
                 item.getEnabled(),
-                item.getWeight()
+                item.getWeight(),
+                item.getMaxPoints(),
+                item.getEvidenceQuestions() != null && !item.getEvidenceQuestions().isBlank(),
+                item.getScoringRules() != null && !item.getScoringRules().isBlank()
         );
     }
 }

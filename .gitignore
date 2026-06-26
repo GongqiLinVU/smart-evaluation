@@ -36,3 +36,6 @@ frontend.log
 
 # === Claude Code ===
 .claude/
+
+# === Sample data (not for public exposure) ===
+Test_Sample/

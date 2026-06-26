@@ -77,6 +77,10 @@ export default function TutorDashboardPage() {
     evaluated.length > 0
       ? evaluated.reduce((sum, s) => sum + s.latestScore!, 0) / evaluated.length
       : 0;
+  const commonMaxScore =
+    evaluated.length > 0
+      ? evaluated[0].latestMaxScore ?? 30
+      : 30;
 
   const columns: ColumnsType<SubmissionResponse> = [
     {
@@ -126,7 +130,7 @@ export default function TutorDashboardPage() {
       render: (_, record) =>
         record.latestScore !== null && record.latestLevel !== null ? (
           <span>
-            <strong>{record.latestScore}</strong>/30{' '}
+            <strong>{record.latestScore}</strong>/{record.latestMaxScore ?? 30}{' '}
             <Tag color={getLevelColor(record.latestLevel)}>
               {record.latestLevel}
             </Tag>
@@ -190,7 +194,7 @@ export default function TutorDashboardPage() {
             <Statistic
               title="Average Score"
               value={avgScore ? avgScore.toFixed(1) : '-'}
-              suffix={avgScore ? '/30' : ''}
+              suffix={avgScore ? `/${commonMaxScore}` : ''}
             />
           </Card>
         </Col>

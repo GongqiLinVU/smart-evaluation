@@ -27,6 +27,7 @@ public class CriterionScore {
     private Integer score;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 50)
     private PerformanceLevel level;
 
     @Lob

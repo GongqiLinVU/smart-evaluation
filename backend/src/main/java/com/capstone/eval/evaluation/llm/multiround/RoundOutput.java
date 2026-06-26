@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 public record RoundOutput(
         int roundNumber,
         String rawResponse,
+        String userPrompt,
         JsonNode parsedJson,
         int promptTokens,
         int completionTokens,

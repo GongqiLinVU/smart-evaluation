@@ -128,3 +128,4 @@ Detailed design documents are available in the `docs/` directory:
 | [Rubric Design](docs/rubric-design.md) | Detailed rubric with sub-criteria, scoring guides, evidence mapping |
 | [System Architecture](docs/architecture.md) | Full system architecture, agent roles, decision pipeline |
 | [System Overview](docs/system-overview.md) | High-level system overview |
+| [Bulk Assessment Workflow](docs/bulk-assessment-workflow.md) | Bulk upload, group management, batch evaluation, export |

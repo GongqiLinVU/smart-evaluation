@@ -153,7 +153,7 @@ export default function AdminDashboardPage() {
       render: (_, record) =>
         record.latestScore !== null && record.latestLevel !== null ? (
           <span>
-            <strong>{record.latestScore}</strong>/30{' '}
+            <strong>{record.latestScore}</strong>/{record.latestMaxScore ?? 30}{' '}
             <Tag color={getLevelColor(record.latestLevel)}>
               {record.latestLevel}
             </Tag>

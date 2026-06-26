@@ -18,6 +18,10 @@ import type {
   RuleResponse,
   LlmConfigResponse,
   PromptPreviewResponse,
+  GroupResponse,
+  GroupSubmissionInfoResponse,
+  BulkUploadResponse,
+  BatchStatusResponse,
 } from '../types';
 
 const api = axios.create({
@@ -204,12 +208,13 @@ export async function getSubmissionDetail(
 // Evaluations
 export async function runEvaluation(
   submissionId: number,
-  method: 'RULE_BASED' | 'LLM' = 'RULE_BASED',
+  method: 'RULE_BASED' | 'LLM' | 'HYBRID' = 'RULE_BASED',
+  visibility: 'PUBLIC' | 'INTERNAL' = 'PUBLIC',
 ): Promise<EvaluationResultResponse> {
   const { data } = await api.post<EvaluationResultResponse>(
     `/evaluations/run/${submissionId}`,
     null,
-    { params: { method } },
+    { params: { method, visibility } },
   );
   return data;
 }
@@ -219,6 +224,40 @@ export async function getEvaluation(
 ): Promise<EvaluationResultResponse> {
   const { data } = await api.get<EvaluationResultResponse>(
     `/evaluations/${id}`,
+  );
+  return data;
+}
+
+export async function getEvaluationRounds(
+  evaluationId: number,
+): Promise<EvaluationRoundResponse[]> {
+  const { data } = await api.get<EvaluationRoundResponse[]>(
+    `/evaluations/${evaluationId}/rounds`,
+  );
+  return data;
+}
+
+export interface EvaluationRoundResponse {
+  id: number;
+  roundNumber: number;
+  roundType: string;
+  inputSections: string | null;
+  targetCriteria: string | null;
+  systemPrompt: string | null;
+  userPrompt: string | null;
+  rawResponse: string | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  status: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export async function verifyEvaluation(
+  evaluationId: number,
+): Promise<EvaluationResultResponse> {
+  const { data } = await api.post<EvaluationResultResponse>(
+    `/evaluations/${evaluationId}/verify`,
   );
   return data;
 }
@@ -363,7 +402,7 @@ export async function listProjectTasks(
 
 export async function createProjectTask(
   projectId: number,
-  req: { name: string; description?: string; displayOrder?: number; rulePackageId?: number },
+  req: { name: string; description?: string; displayOrder?: number; rulePackageId?: number; llmConfigId?: number },
 ): Promise<ProjectTaskResponse> {
   const { data } = await api.post<ProjectTaskResponse>(
     `/projects/${projectId}/tasks`,
@@ -375,7 +414,7 @@ export async function createProjectTask(
 export async function updateProjectTask(
   projectId: number,
   taskId: number,
-  req: { name: string; description?: string; displayOrder?: number; rulePackageId?: number },
+  req: { name: string; description?: string; displayOrder?: number; rulePackageId?: number; llmConfigId?: number },
 ): Promise<ProjectTaskResponse> {
   const { data } = await api.put<ProjectTaskResponse>(
     `/projects/${projectId}/tasks/${taskId}`,
@@ -533,6 +572,7 @@ export async function createRulePackage(req: {
   methodologyWeight: number;
   implementationWeight: number;
   isDefault?: boolean;
+  scoringScale?: string;
   items?: { ruleId: number; enabled: boolean; weight: number }[];
 }): Promise<RulePackageResponse> {
   const { data } = await api.post<RulePackageResponse>('/rule-packages', req);
@@ -551,6 +591,7 @@ export async function updateRulePackage(
     methodologyWeight: number;
     implementationWeight: number;
     isDefault?: boolean;
+    scoringScale?: string;
     items?: { ruleId: number; enabled: boolean; weight: number }[];
   },
 ): Promise<RulePackageResponse> {
@@ -582,6 +623,7 @@ export async function createLlmConfig(req: {
   maxTokens?: number;
   provider?: string;
   model?: string;
+  multimodal?: boolean;
   isDefault?: boolean;
 }): Promise<LlmConfigResponse> {
   const { data } = await api.post<LlmConfigResponse>('/llm-config', req);
@@ -599,6 +641,7 @@ export async function updateLlmConfig(
     maxTokens?: number;
     provider?: string;
     model?: string;
+    multimodal?: boolean;
     isDefault?: boolean;
   },
 ): Promise<LlmConfigResponse> {
@@ -625,6 +668,107 @@ export async function previewLlmPrompt(
     { params: { rulePackageId } },
   );
   return data;
+}
+
+// Groups
+export async function listGroups(projectId: number): Promise<GroupResponse[]> {
+  const { data } = await api.get<GroupResponse[]>(`/projects/${projectId}/groups`);
+  return data;
+}
+
+export async function createGroup(projectId: number, req: {
+  groupCode: string;
+  groupName?: string;
+  members?: { studentName: string; studentId?: string; email?: string; contributionPercent?: number }[];
+}): Promise<GroupResponse> {
+  const { data } = await api.post<GroupResponse>(`/projects/${projectId}/groups`, req);
+  return data;
+}
+
+export async function updateGroup(groupId: number, req: {
+  groupCode: string;
+  groupName?: string;
+  members?: { studentName: string; studentId?: string; email?: string; contributionPercent?: number }[];
+}): Promise<GroupResponse> {
+  const { data } = await api.put<GroupResponse>(`/groups/${groupId}`, req);
+  return data;
+}
+
+export async function deleteGroup(groupId: number): Promise<void> {
+  await api.delete(`/groups/${groupId}`);
+}
+
+export async function importGroupsCsv(projectId: number, file: File): Promise<GroupResponse[]> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const { data } = await api.post<GroupResponse[]>(`/projects/${projectId}/groups/import`, formData);
+  return data;
+}
+
+export async function getGroupSubmissions(taskId: number): Promise<GroupSubmissionInfoResponse[]> {
+  const { data } = await api.get<GroupSubmissionInfoResponse[]>(`/tasks/${taskId}/group-submissions`);
+  return data;
+}
+
+// Bulk Upload
+export async function bulkUpload(taskId: number, files: File[]): Promise<BulkUploadResponse> {
+  const formData = new FormData();
+  files.forEach(f => formData.append('files', f));
+  const { data } = await api.post<BulkUploadResponse>(`/tasks/${taskId}/bulk-upload`, formData);
+  return data;
+}
+
+// Batch Evaluation
+export async function startBatchEvaluation(taskId: number, method: string = 'LLM'): Promise<void> {
+  await api.post(`/evaluations/batch/${taskId}`, null, { params: { method } });
+}
+
+export async function getBatchStatus(taskId: number): Promise<BatchStatusResponse> {
+  const { data } = await api.get<BatchStatusResponse>(`/evaluations/batch/${taskId}/status`);
+  return data;
+}
+
+// Export
+export async function exportTaskResults(taskId: number): Promise<Blob> {
+  const { data } = await api.get(`/tasks/${taskId}/export`, { responseType: 'blob' });
+  return data;
+}
+
+// Hybrid Evaluation Config
+export interface HybridGenerationResponse {
+  questions: { questions: { id: string; text: string; type: string; required: boolean }[] };
+  scoringRules: { maxPoints: number; rules: { id: string; description: string; condition: string; points: number }[]; levelMapping: Record<string, { min: number; max: number }> };
+  saved: boolean;
+}
+
+export async function generateEvidenceQuestions(
+  packageId: number,
+  itemId: number,
+): Promise<HybridGenerationResponse> {
+  const { data } = await api.post<HybridGenerationResponse>(
+    `/hybrid/rule-packages/${packageId}/generate-questions/${itemId}`,
+    null,
+    { params: { save: true } },
+  );
+  return data;
+}
+
+export async function getEvidenceQuestions(packageId: number, itemId: number): Promise<unknown> {
+  const { data } = await api.get(`/hybrid/rule-packages/${packageId}/items/${itemId}/evidence-questions`);
+  return data;
+}
+
+export async function getScoringRules(packageId: number, itemId: number): Promise<unknown> {
+  const { data } = await api.get(`/hybrid/rule-packages/${packageId}/items/${itemId}/scoring-rules`);
+  return data;
+}
+
+export async function updateEvidenceQuestions(packageId: number, itemId: number, questions: unknown): Promise<void> {
+  await api.put(`/hybrid/rule-packages/${packageId}/items/${itemId}/evidence-questions`, questions);
+}
+
+export async function updateScoringRules(packageId: number, itemId: number, rules: unknown): Promise<void> {
+  await api.put(`/hybrid/rule-packages/${packageId}/items/${itemId}/scoring-rules`, rules);
 }
 
 export default api;

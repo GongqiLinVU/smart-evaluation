@@ -8,11 +8,11 @@ const { Title, Text } = Typography;
 
 function getLevelColor(level: string | null): string {
   switch (level) {
-    case 'EXCELLENT': return '#52c41a';
-    case 'PROFICIENT': return '#1890ff';
-    case 'COMPETENT': return '#faad14';
-    case 'DEVELOPING': return '#fa8c16';
-    case 'INADEQUATE': return '#f5222d';
+    case 'EXCELLENT': case 'HD': return '#52c41a';
+    case 'PROFICIENT': case 'D': return '#1890ff';
+    case 'COMPETENT': case 'C': return '#faad14';
+    case 'DEVELOPING': case 'P': return '#fa8c16';
+    case 'INADEQUATE': case 'F': return '#f5222d';
     default: return '#d9d9d9';
   }
 }

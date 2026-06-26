@@ -66,6 +66,11 @@ export default function DashboardPage() {
       ? submissions[0].latestScore
       : null;
 
+  const latestMaxScore =
+    submissions.length > 0 && submissions[0].latestMaxScore !== null
+      ? submissions[0].latestMaxScore
+      : 30;
+
   const bestScore = submissions.reduce(
     (max, s) => (s.latestScore !== null && s.latestScore > max ? s.latestScore : max),
     0,
@@ -131,7 +136,7 @@ export default function DashboardPage() {
       render: (_, record) =>
         record.latestScore !== null && record.latestLevel !== null ? (
           <span>
-            <strong>{record.latestScore}</strong>/30{' '}
+            <strong>{record.latestScore}</strong>/{record.latestMaxScore ?? 30}{' '}
             <Tag color={getLevelColor(record.latestLevel)}>
               {record.latestLevel}
             </Tag>
@@ -170,7 +175,7 @@ export default function DashboardPage() {
             <Statistic
               title="Latest Score"
               value={latestScore ?? '-'}
-              suffix={latestScore !== null ? '/30' : ''}
+              suffix={latestScore !== null ? `/${latestMaxScore}` : ''}
               prefix={<TrophyOutlined />}
             />
           </Card>
@@ -180,7 +185,7 @@ export default function DashboardPage() {
             <Statistic
               title="Best Score"
               value={bestScore || '-'}
-              suffix={bestScore ? '/30' : ''}
+              suffix={bestScore ? `/${latestMaxScore}` : ''}
               prefix={<TrophyOutlined />}
               valueStyle={bestScore >= 24 ? { color: '#52c41a' } : undefined}
             />

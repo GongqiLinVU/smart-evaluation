@@ -16,6 +16,7 @@ public record RulePackageResponse(
         Double logicWeight,
         Double methodologyWeight,
         Double implementationWeight,
+        String scoringScale,
         List<RulePackageItemResponse> items,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -37,6 +38,7 @@ public record RulePackageResponse(
                 rp.getLogicWeight(),
                 rp.getMethodologyWeight(),
                 rp.getImplementationWeight(),
+                rp.getScoringScale(),
                 itemResponses,
                 rp.getCreatedAt(),
                 rp.getUpdatedAt()

@@ -15,5 +15,6 @@ public record RulePackageRequest(
         @NotNull Double methodologyWeight,
         @NotNull Double implementationWeight,
         Boolean isDefault,
+        String scoringScale,
         List<RulePackageItemRequest> items
 ) {}

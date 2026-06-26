@@ -91,6 +91,7 @@ export default function LlmConfigPage() {
       maxTokens: config.maxTokens ?? 4096,
       provider: config.provider,
       model: config.model,
+      multimodal: config.multimodal,
       isDefault: config.isDefault,
     });
     setModalOpen(true);
@@ -174,6 +175,12 @@ export default function LlmConfigPage() {
       dataIndex: 'model',
       key: 'model',
       render: (v: string | null) => v || <Text type="secondary">Provider default</Text>,
+    },
+    {
+      title: 'Multimodal',
+      dataIndex: 'multimodal',
+      key: 'multimodal',
+      render: (v: boolean) => v ? <Tag color="purple">Yes</Tag> : <Tag>No</Tag>,
     },
     {
       title: 'Temperature',
@@ -278,29 +285,48 @@ export default function LlmConfigPage() {
                   </Space>
                   {preview && (
                     <Card size="small">
-                      <Descriptions column={2} size="small" style={{ marginBottom: 12 }}>
-                        <Descriptions.Item label="Estimated Tokens">
-                          {preview.estimatedTokens.toLocaleString()}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Criteria Included">
-                          {preview.criteriaIncluded.map((c) => (
-                            <Tag key={c} color="blue">{c}</Tag>
-                          ))}
-                        </Descriptions.Item>
-                      </Descriptions>
-                      <pre
-                        style={{
-                          background: '#f5f5f5',
-                          padding: 16,
-                          borderRadius: 8,
-                          maxHeight: 500,
-                          overflow: 'auto',
-                          fontSize: 12,
-                          whiteSpace: 'pre-wrap',
-                        }}
-                      >
-                        {preview.systemPrompt}
-                      </pre>
+                      <div style={{ marginBottom: 12 }}>
+                        <Space direction="vertical" style={{ width: '100%' }} size="small">
+                          <div>
+                            <Text type="secondary">Estimated Tokens: </Text>
+                            <Text strong>{preview.estimatedTokens.toLocaleString()}</Text>
+                          </div>
+                          <div>
+                            <Text type="secondary">Criteria Included: </Text>
+                            <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {preview.criteriaIncluded.map((c) => (
+                                <Tag key={c} color="blue">{c}</Tag>
+                              ))}
+                            </div>
+                          </div>
+                        </Space>
+                      </div>
+                      <div style={{ position: 'relative' }}>
+                        <Button
+                          size="small"
+                          icon={<CopyOutlined />}
+                          style={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }}
+                          onClick={() => {
+                            navigator.clipboard.writeText(preview.systemPrompt);
+                            message.success('Prompt copied to clipboard');
+                          }}
+                        >
+                          Copy
+                        </Button>
+                        <pre
+                          style={{
+                            background: '#f5f5f5',
+                            padding: 16,
+                            borderRadius: 8,
+                            maxHeight: 500,
+                            overflow: 'auto',
+                            fontSize: 12,
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          {preview.systemPrompt}
+                        </pre>
+                      </div>
                     </Card>
                   )}
                 </Space>
@@ -349,8 +375,10 @@ export default function LlmConfigPage() {
                 <Paragraph>Use these in the System Prompt Template:</Paragraph>
                 <ul>
                   <li><code>{'{{criteria_block}}'}</code> &mdash; dynamically assembled from enabled rules' LLM criterion prompts</li>
-                  <li><code>{'{{output_format}}'}</code> &mdash; the JSON output schema</li>
+                  <li><code>{'{{output_format}}'}</code> &mdash; the JSON output schema (auto-generated with correct scores/levels)</li>
                   <li><code>{'{{additional_context}}'}</code> &mdash; tutor-provided context notes</li>
+                  <li><code>{'{{scoring_scale_table}}'}</code> &mdash; scoring level table from the rule package's configured scale</li>
+                  <li><code>{'{{valid_score_values}}'}</code> &mdash; comma-separated valid score values (e.g., "2, 4, 6, 8, 10")</li>
                 </ul>
               </Card>
             ),
@@ -383,6 +411,12 @@ export default function LlmConfigPage() {
 
           <Form.Item name="model" label="Model">
             <Input placeholder="e.g., deepseek-chat, gpt-4o (leave empty for provider default)" />
+          </Form.Item>
+
+          <Form.Item name="multimodal" label="Multimodal (can process images)" valuePropName="checked"
+            extra="Enable if this model can analyze images/screenshots in student submissions. Recommended for image-heavy reports."
+          >
+            <Switch />
           </Form.Item>
 
           <Form.Item name="temperature" label="Temperature">

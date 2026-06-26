@@ -32,6 +32,10 @@ public class ProjectTask {
     @JoinColumn(name = "rule_package_id")
     private RulePackage rulePackage;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "llm_config_id")
+    private LlmConfig llmConfig;
+
     @Builder.Default
     private Integer displayOrder = 0;
 

@@ -11,6 +11,7 @@ import {
   SettingOutlined,
   ExperimentOutlined,
   RobotOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useAuth } from './context/AuthContext';
@@ -28,6 +29,7 @@ import ProjectsPage from './pages/ProjectsPage';
 import ScoringSettingsPage from './pages/ScoringSettingsPage';
 import RulePackagesPage from './pages/RulePackagesPage';
 import LlmConfigPage from './pages/LlmConfigPage';
+import BatchAssessmentPage from './pages/BatchAssessmentPage';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -43,21 +45,23 @@ function AuthenticatedApp() {
   const location = useLocation();
   const { user, logout, isAdmin, isTutor, isStudent } = useAuth();
 
-  const selectedKey = location.pathname.startsWith('/submissions')
-    ? '/submissions'
-    : location.pathname.startsWith('/upload')
-      ? '/upload'
-      : location.pathname.startsWith('/projects')
-        ? '/projects'
-        : location.pathname.startsWith('/admin/rules')
-          ? '/admin/rules'
-          : location.pathname.startsWith('/admin/llm-config')
-            ? '/admin/llm-config'
-            : location.pathname.startsWith('/admin/scoring')
-              ? '/admin/scoring'
-              : location.pathname.startsWith('/admin')
-                ? '/admin/users'
-                : '/';
+  const selectedKey = location.pathname.startsWith('/batch')
+    ? '/batch'
+    : location.pathname.startsWith('/submissions')
+      ? '/submissions'
+      : location.pathname.startsWith('/upload')
+        ? '/upload'
+        : location.pathname.startsWith('/projects')
+          ? '/projects'
+          : location.pathname.startsWith('/admin/rules')
+            ? '/admin/rules'
+            : location.pathname.startsWith('/admin/llm-config')
+              ? '/admin/llm-config'
+              : location.pathname.startsWith('/admin/scoring')
+                ? '/admin/scoring'
+                : location.pathname.startsWith('/admin')
+                  ? '/admin/users'
+                  : '/';
 
   const menuItems: MenuProps['items'] = [
     {
@@ -95,6 +99,11 @@ function AuthenticatedApp() {
       key: '/admin/llm-config',
       icon: <RobotOutlined />,
       label: <Link to="/admin/llm-config">LLM Config</Link>,
+    });
+    menuItems.push({
+      key: '/batch',
+      icon: <ThunderboltOutlined />,
+      label: <Link to="/batch">Batch</Link>,
     });
   }
 
@@ -193,6 +202,9 @@ function AuthenticatedApp() {
           )}
           {(isAdmin || isTutor) && (
             <Route path="/admin/llm-config" element={<LlmConfigPage />} />
+          )}
+          {(isAdmin || isTutor) && (
+            <Route path="/batch" element={<BatchAssessmentPage />} />
           )}
           <Route path="/submissions/:id" element={<ResultPage />} />
           <Route path="/profile" element={<ProfilePage />} />

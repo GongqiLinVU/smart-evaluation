@@ -6,6 +6,7 @@ public record CreateProjectTaskRequest(
         @NotBlank String name,
         String description,
         Integer displayOrder,
-        Long rulePackageId
+        Long rulePackageId,
+        Long llmConfigId
 ) {
 }

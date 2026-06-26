@@ -12,4 +12,6 @@ public interface ProjectTaskRepository extends JpaRepository<ProjectTask, Long> 
     List<ProjectTask> findByProjectIdOrderByDisplayOrderAsc(Long projectId);
 
     int countByProjectId(Long projectId);
+
+    void deleteByProjectId(Long projectId);
 }

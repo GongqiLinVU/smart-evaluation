@@ -28,11 +28,13 @@ import {
   ToolOutlined,
   FileTextOutlined,
   EyeOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   getSubmissionDetail,
   runEvaluation,
+  verifyEvaluation,
   submitFeedback,
   getFeedback,
   adjustScore,
@@ -54,9 +56,23 @@ import DocumentStats from '../components/DocumentStats';
 import FeedbackPanel from '../components/FeedbackPanel';
 import TutorReviewPanel from '../components/TutorReviewPanel';
 import CompositeScorePanel from '../components/CompositeScorePanel';
+import EvaluationDebugPanel from '../components/EvaluationDebugPanel';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+
+function getMethodLabel(method: string): string {
+  if (method === 'RULE_BASED') return 'Rule-Based';
+  if (method === 'HYBRID') return 'Hybrid';
+  if (method === 'LLM') return 'LLM';
+  return method;
+}
+
+function getMethodColor(method: string): string {
+  if (method === 'RULE_BASED') return 'purple';
+  if (method === 'HYBRID') return 'geekblue';
+  return 'cyan';
+}
 
 function getStatusColor(status: string): string {
   const upper = status.toUpperCase();
@@ -88,6 +104,7 @@ export default function ResultPage() {
     null,
   );
   const [refreshKey, setRefreshKey] = useState(0);
+  const [verifyLoading, setVerifyLoading] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -147,9 +164,7 @@ export default function ResultPage() {
     setEvalMethod(method);
     try {
       const result = await runEvaluation(Number(id), method);
-      message.success(
-        `${method === 'RULE_BASED' ? 'Rule-based' : 'LLM'} evaluation completed!`,
-      );
+      message.success(`${getMethodLabel(method)} evaluation completed!`);
       setSelectedEvaluation(result);
       await fetchDetail();
     } catch {
@@ -193,6 +208,22 @@ export default function ResultPage() {
     }
   };
 
+  const handleVerify = async (evaluationId: number) => {
+    setVerifyLoading(true);
+    try {
+      const result = await verifyEvaluation(evaluationId);
+      message.success(
+        `Verification complete (${result.overallScore}/${result.maxScore || 30}). New evaluation created.`,
+      );
+      setSelectedEvaluation(result);
+      await fetchDetail();
+    } catch {
+      message.error('Verification failed. Please try again.');
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 100 }}>
@@ -222,7 +253,7 @@ export default function ResultPage() {
   return (
     <Spin
       spinning={evalLoading}
-      tip={`Running ${evalMethod === 'RULE_BASED' ? 'rule-based' : 'LLM'} evaluation...`}
+      tip={`Running ${evalMethod ? getMethodLabel(evalMethod) : ''} evaluation...`}
     >
       <div>
         {/* Header */}
@@ -359,18 +390,27 @@ export default function ResultPage() {
                 {
                   title: 'Method',
                   dataIndex: 'method',
-                  width: 120,
-                  render: (method: string) => (
-                    <Tag color={method === 'RULE_BASED' ? 'purple' : 'cyan'}>
-                      {method === 'RULE_BASED' ? 'Rule-Based' : 'LLM'}
-                    </Tag>
+                  width: 160,
+                  render: (method: string, record: EvaluationResultResponse) => (
+                    <>
+                      <Tag color={getMethodColor(method)}>
+                        {getMethodLabel(method)}
+                      </Tag>
+                      {record.visibility === 'INTERNAL' && record.overallFeedback?.includes('Verification') && (
+                        <Tag color="green" icon={<SafetyCertificateOutlined />}>Verified</Tag>
+                      )}
+                      {record.visibility === 'INTERNAL' && !record.overallFeedback?.includes('Verification') && (
+                        <Tag color="orange">Internal</Tag>
+                      )}
+                    </>
                   ),
                 },
                 {
                   title: 'Score',
                   dataIndex: 'overallScore',
                   width: 80,
-                  render: (score: number) => `${score}/30`,
+                  render: (score: number, record: EvaluationResultResponse) =>
+                    `${score}/${record.maxScore || 30}`,
                 },
                 {
                   title: 'Level',
@@ -413,16 +453,8 @@ export default function ResultPage() {
                 <Title level={4} style={{ margin: 0 }}>
                   Evaluation #{selectedEvaluation.id}
                 </Title>
-                <Tag
-                  color={
-                    selectedEvaluation.method === 'RULE_BASED'
-                      ? 'purple'
-                      : 'cyan'
-                  }
-                >
-                  {selectedEvaluation.method === 'RULE_BASED'
-                    ? 'Rule-Based'
-                    : 'LLM'}
+                <Tag color={getMethodColor(selectedEvaluation.method)}>
+                  {getMethodLabel(selectedEvaluation.method)}
                 </Tag>
                 <Tag>
                   {dayjs(selectedEvaluation.evaluatedAt).format(
@@ -432,7 +464,7 @@ export default function ResultPage() {
               </Space>
             }
             extra={
-              selectedEvaluation.method === 'LLM' &&
+              (selectedEvaluation.method === 'LLM' || selectedEvaluation.method === 'HYBRID') &&
               selectedEvaluation.rawLlmResponse ? (
                 <Button
                   size="small"
@@ -448,6 +480,7 @@ export default function ResultPage() {
           >
             <ScoreSummary
               score={selectedEvaluation.overallScore}
+              maxScore={selectedEvaluation.maxScore || 30}
               level={selectedEvaluation.overallLevel}
               method={selectedEvaluation.method}
             />
@@ -458,7 +491,7 @@ export default function ResultPage() {
             <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
               {selectedEvaluation.criteria.map((criterion) => (
                 <Col key={criterion.criterionName} xs={24} md={8}>
-                  <ScoreCard criterion={criterion} />
+                  <ScoreCard criterion={criterion} maxScore={selectedEvaluation.maxScore || 30} />
                 </Col>
               ))}
             </Row>
@@ -470,6 +503,14 @@ export default function ResultPage() {
               improvements={selectedEvaluation.improvements}
               overallFeedback={selectedEvaluation.overallFeedback}
             />
+
+            {/* Debug Panel for LLM/Hybrid evaluations */}
+            {(selectedEvaluation.method === 'LLM' || selectedEvaluation.method === 'HYBRID') && (isAdmin || isTutor) && (
+              <>
+                <Divider />
+                <EvaluationDebugPanel evaluationId={selectedEvaluation.id} />
+              </>
+            )}
 
             {/* Score Adjustments History */}
             {adjustments[selectedEvaluation.id] &&
@@ -494,10 +535,32 @@ export default function ResultPage() {
                 </>
               )}
 
-            {/* Tutor: Adjust Score */}
+            {/* Tutor: Verify & Adjust Score */}
             {(isAdmin || isTutor) && (
               <>
                 <Divider />
+                {selectedEvaluation.method === 'LLM' && (
+                  <div style={{ marginBottom: 16 }}>
+                    <Button
+                      type="default"
+                      icon={<SafetyCertificateOutlined />}
+                      loading={verifyLoading}
+                      onClick={() => handleVerify(selectedEvaluation.id)}
+                    >
+                      Verify (3-Round Decision Chain)
+                    </Button>
+                    <span style={{ marginLeft: 8, color: '#888', fontSize: 12 }}>
+                      Runs 3 LLM rounds to cross-check this score against the rubric
+                    </span>
+                  </div>
+                )}
+                {selectedEvaluation.method === 'HYBRID' && (
+                  <div style={{ marginBottom: 16 }}>
+                    <Tag color="geekblue" icon={<SafetyCertificateOutlined />}>
+                      Hybrid evaluation — evidence extracted by LLM, scored deterministically by rules
+                    </Tag>
+                  </div>
+                )}
                 <Title level={5}>Adjust Score</Title>
                 <AdjustScoreForm
                   currentScore={selectedEvaluation.overallScore}

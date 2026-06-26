@@ -25,6 +25,7 @@ export interface SubmissionResponse {
   status: string;
   latestScore: number | null;
   latestLevel: string | null;
+  latestMaxScore: number | null;
   projectId: number | null;
   projectName: string | null;
   taskId: number | null;
@@ -54,7 +55,9 @@ export interface EvaluationResultResponse {
   id: number;
   submissionId: number;
   method: string;
+  visibility: string;
   overallScore: number;
+  maxScore: number;
   overallLevel: string;
   overallFeedback: string;
   strengths: string[];
@@ -127,6 +130,8 @@ export interface ProjectTaskResponse {
   displayOrder: number;
   rulePackageId: number | null;
   rulePackageName: string | null;
+  llmConfigId: number | null;
+  llmConfigName: string | null;
   createdAt: string;
 }
 
@@ -204,6 +209,15 @@ export interface RulePackageItemResponse {
   ruleCategory: string | null;
   enabled: boolean;
   weight: number;
+  maxPoints: number | null;
+  hasEvidenceQuestions: boolean;
+  hasScoringRules: boolean;
+}
+
+export interface ScoringScaleEntry {
+  level: string;
+  points: number;
+  description?: string;
 }
 
 export interface RulePackageResponse {
@@ -217,6 +231,7 @@ export interface RulePackageResponse {
   logicWeight: number;
   methodologyWeight: number;
   implementationWeight: number;
+  scoringScale: string | null;
   items: RulePackageItemResponse[];
   createdAt: string;
   updatedAt: string;
@@ -232,6 +247,7 @@ export interface LlmConfigResponse {
   maxTokens: number | null;
   provider: string | null;
   model: string | null;
+  multimodal: boolean;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
@@ -241,4 +257,58 @@ export interface PromptPreviewResponse {
   systemPrompt: string;
   estimatedTokens: number;
   criteriaIncluded: string[];
+}
+
+// Batch Assessment types
+export interface GroupMemberResponse {
+  id: number;
+  studentName: string;
+  studentId: string | null;
+  email: string | null;
+  linked: boolean;
+  contributionPercent: number | null;
+}
+
+export interface GroupResponse {
+  id: number;
+  groupCode: string;
+  groupName: string | null;
+  projectId: number;
+  members: GroupMemberResponse[];
+  createdAt: string;
+}
+
+export interface BulkUploadResponse {
+  uploaded: number;
+  groupsCreated: number;
+  groupsMatched: number;
+  submissions: { submissionId: number; groupCode: string; filename: string }[];
+  errors: { filename: string; reason: string }[];
+}
+
+export interface GroupSubmissionInfoResponse {
+  groupId: number;
+  groupCode: string;
+  submissionId: number;
+  fileName: string;
+  fileSizeBytes: number;
+  status: string;
+  uploadedAt: string;
+  documentStats: DocumentStatsResponse | null;
+  imageHeavy: boolean;
+}
+
+export interface BatchStatusResponse {
+  taskId: number;
+  total: number;
+  completed: number;
+  failed: number;
+  status: string;
+  items: {
+    submissionId: number;
+    groupCode: string;
+    status: string;
+    overallScore: number | null;
+    error: string | null;
+  }[];
 }

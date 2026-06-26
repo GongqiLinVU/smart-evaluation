@@ -10,4 +10,6 @@ import java.util.List;
 public interface ScoreAdjustmentRepository extends JpaRepository<ScoreAdjustment, Long> {
 
     List<ScoreAdjustment> findByEvaluationId(Long evaluationId);
+
+    void deleteByEvaluationId(Long evaluationId);
 }

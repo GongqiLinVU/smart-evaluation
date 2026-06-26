@@ -10,4 +10,6 @@ import java.util.Optional;
 public interface ParsedDocumentRepository extends JpaRepository<ParsedDocumentEntity, Long> {
 
     Optional<ParsedDocumentEntity> findBySubmissionId(Long submissionId);
+
+    void deleteBySubmissionId(Long submissionId);
 }

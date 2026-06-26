@@ -48,6 +48,7 @@ public class LlmConfigService {
                 .maxTokens(request.maxTokens())
                 .provider(request.provider())
                 .model(request.model())
+                .multimodal(Boolean.TRUE.equals(request.multimodal()))
                 .isDefault(Boolean.TRUE.equals(request.isDefault()))
                 .build();
 
@@ -69,6 +70,7 @@ public class LlmConfigService {
         config.setMaxTokens(request.maxTokens());
         config.setProvider(request.provider());
         config.setModel(request.model());
+        config.setMultimodal(Boolean.TRUE.equals(request.multimodal()));
 
         if (Boolean.TRUE.equals(request.isDefault()) && !Boolean.TRUE.equals(config.getIsDefault())) {
             clearDefaultFlag();
@@ -97,6 +99,7 @@ public class LlmConfigService {
                 .maxTokens(source.getMaxTokens())
                 .provider(source.getProvider())
                 .model(source.getModel())
+                .multimodal(source.getMultimodal())
                 .isDefault(false)
                 .build();
         return llmConfigRepository.save(copy);
@@ -111,7 +114,7 @@ public class LlmConfigService {
                 .filter(item -> Boolean.TRUE.equals(item.getEnabled()))
                 .toList();
 
-        String systemPrompt = dynamicPromptBuilder.previewSystemPrompt(config, enabledRules);
+        String systemPrompt = dynamicPromptBuilder.previewSystemPrompt(config, enabledRules, rulePackage);
 
         List<String> criteriaIncluded = enabledRules.stream()
                 .map(item -> item.getRule().getName())

@@ -2,15 +2,9 @@ package com.capstone.eval.service;
 
 import com.capstone.eval.config.FileStorageConfig;
 import com.capstone.eval.exception.DocumentParseException;
-import com.capstone.eval.model.Project;
-import com.capstone.eval.model.ProjectTask;
-import com.capstone.eval.model.Submission;
-import com.capstone.eval.model.User;
+import com.capstone.eval.model.*;
 import com.capstone.eval.model.enums.EvaluationStatus;
-import com.capstone.eval.repository.ProjectRepository;
-import com.capstone.eval.repository.ProjectTaskRepository;
-import com.capstone.eval.repository.SubmissionRepository;
-import com.capstone.eval.repository.UserRepository;
+import com.capstone.eval.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -29,17 +23,20 @@ public class SubmissionService {
     private final UserRepository userRepository;
     private final ProjectRepository projectRepository;
     private final ProjectTaskRepository projectTaskRepository;
+    private final GroupMemberRepository groupMemberRepository;
     private final FileStorageConfig fileStorageConfig;
 
     public SubmissionService(SubmissionRepository submissionRepository,
                              UserRepository userRepository,
                              ProjectRepository projectRepository,
                              ProjectTaskRepository projectTaskRepository,
+                             GroupMemberRepository groupMemberRepository,
                              FileStorageConfig fileStorageConfig) {
         this.submissionRepository = submissionRepository;
         this.userRepository = userRepository;
         this.projectRepository = projectRepository;
         this.projectTaskRepository = projectTaskRepository;
+        this.groupMemberRepository = groupMemberRepository;
         this.fileStorageConfig = fileStorageConfig;
     }
 
@@ -81,10 +78,13 @@ public class SubmissionService {
             nextVersion = submissionRepository.findMaxVersionByUserId(userId) + 1;
         }
 
+        Group linkedGroup = resolveGroupForUser(user, project);
+
         Submission submission = Submission.builder()
                 .user(user)
                 .project(project)
                 .task(task)
+                .group(linkedGroup)
                 .studentName(studentName)
                 .fileName(originalFilename)
                 .filePath(targetPath.toString())
@@ -141,5 +141,34 @@ public class SubmissionService {
 
     public List<Submission> getSubmissionsByStudentNameAndProjectAndTask(String studentName, Long projectId, Long taskId) {
         return submissionRepository.findByStudentNameAndProjectIdAndTaskIdOrderByVersionDesc(studentName, projectId, taskId);
+    }
+
+    private Group resolveGroupForUser(User user, Project project) {
+        if (project == null) return null;
+
+        // Match by user ID (if previously linked)
+        return groupMemberRepository.findByUserIdAndProjectId(user.getId(), project.getId())
+                .map(GroupMember::getGroup)
+                // Match by email
+                .or(() -> groupMemberRepository.findByEmailAndProjectId(user.getEmail(), project.getId())
+                        .map(gm -> {
+                            gm.setUser(user);
+                            groupMemberRepository.save(gm);
+                            return gm.getGroup();
+                        }))
+                // Match by studentId = email prefix (e.g., s12345@student.vu.edu.au → "s12345")
+                .or(() -> {
+                    String emailPrefix = user.getEmail().contains("@")
+                            ? user.getEmail().substring(0, user.getEmail().indexOf('@'))
+                            : user.getEmail();
+                    return groupMemberRepository.findByStudentIdAndProjectId(emailPrefix, project.getId())
+                            .map(gm -> {
+                                gm.setUser(user);
+                                gm.setEmail(user.getEmail());
+                                groupMemberRepository.save(gm);
+                                return gm.getGroup();
+                            });
+                })
+                .orElse(null);
     }
 }

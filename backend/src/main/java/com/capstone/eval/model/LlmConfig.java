@@ -42,6 +42,10 @@ public class LlmConfig {
 
     @Builder.Default
     @Column(nullable = false)
+    private Boolean multimodal = false;
+
+    @Builder.Default
+    @Column(nullable = false)
     private Boolean isDefault = false;
 
     private LocalDateTime createdAt;

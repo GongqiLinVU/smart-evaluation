@@ -1,6 +1,7 @@
 package com.capstone.eval.model;
 
 import com.capstone.eval.model.enums.EvaluationMethod;
+import com.capstone.eval.model.enums.EvaluationVisibility;
 import com.capstone.eval.model.enums.PerformanceLevel;
 import jakarta.persistence.*;
 import lombok.*;
@@ -29,10 +30,16 @@ public class EvaluationResult {
     @Column(nullable = false)
     private EvaluationMethod method;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private EvaluationVisibility visibility = EvaluationVisibility.PUBLIC;
+
     @Column(nullable = false)
     private Integer overallScore;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 50)
     private PerformanceLevel overallLevel;
 
     @Lob
@@ -46,6 +53,9 @@ public class EvaluationResult {
     private String improvements;
 
     private Double confidence;
+
+    @Builder.Default
+    private Integer maxScore = 30;
 
     @Lob
     @Column(columnDefinition = "TEXT")

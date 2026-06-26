@@ -50,6 +50,7 @@ public class RulePackageService {
                 .logicWeight(request.logicWeight())
                 .methodologyWeight(request.methodologyWeight())
                 .implementationWeight(request.implementationWeight())
+                .scoringScale(request.scoringScale())
                 .isDefault(Boolean.TRUE.equals(request.isDefault()))
                 .build();
 
@@ -79,6 +80,7 @@ public class RulePackageService {
         rp.setLogicWeight(request.logicWeight());
         rp.setMethodologyWeight(request.methodologyWeight());
         rp.setImplementationWeight(request.implementationWeight());
+        rp.setScoringScale(request.scoringScale());
 
         if (Boolean.TRUE.equals(request.isDefault()) && !Boolean.TRUE.equals(rp.getIsDefault())) {
             clearDefaultFlag();
@@ -110,6 +112,7 @@ public class RulePackageService {
                     .rule(rule)
                     .enabled(itemReq.enabled())
                     .weight(itemReq.weight())
+                    .maxPoints(itemReq.maxPoints())
                     .build();
             rp.getItems().add(item);
         }
@@ -128,8 +131,10 @@ public class RulePackageService {
         if (Boolean.TRUE.equals(request.methodologyEnabled())) totalEnabled += request.methodologyWeight();
         if (Boolean.TRUE.equals(request.implementationEnabled())) totalEnabled += request.implementationWeight();
 
-        if (totalEnabled <= 0) {
-            throw new RuntimeException("At least one rule must be enabled with a positive weight");
+        boolean hasItemRules = request.items() != null && !request.items().isEmpty();
+
+        if (totalEnabled <= 0 && !hasItemRules) {
+            throw new RuntimeException("At least one category must be enabled with a positive weight, or items must be provided");
         }
     }
 }

@@ -14,6 +14,7 @@ public record LlmConfigResponse(
         Integer maxTokens,
         String provider,
         String model,
+        Boolean multimodal,
         Boolean isDefault,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -29,6 +30,7 @@ public record LlmConfigResponse(
                 config.getMaxTokens(),
                 config.getProvider(),
                 config.getModel(),
+                config.getMultimodal(),
                 config.getIsDefault(),
                 config.getCreatedAt(),
                 config.getUpdatedAt()

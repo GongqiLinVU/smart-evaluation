@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Table, Tag, Button, Spin, Typography, Space, Card, Select } from 'antd';
-import { ReloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { Table, Tag, Button, Spin, Typography, Space, Card, Select, message, Modal, Divider, Dropdown } from 'antd';
+import { ReloadOutlined, EyeOutlined, RobotOutlined, CheckCircleOutlined, ExperimentOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { listLatestSubmissions, listVersions } from '../api/client';
+import { listLatestSubmissions, listVersions, runEvaluation } from '../api/client';
 import ProjectSelector from '../components/ProjectSelector';
-import type { SubmissionResponse } from '../types';
+import ScoreSummary from '../components/ScoreSummary';
+import type { SubmissionResponse, EvaluationResultResponse } from '../types';
 
 const { Title } = Typography;
 
@@ -38,6 +39,8 @@ export default function SubmissionListPage() {
     {},
   );
   const [selectedProjectId, setSelectedProjectId] = useState<number | undefined>();
+  const [evalRunning, setEvalRunning] = useState<Record<number, boolean>>({});
+  const [evalResult, setEvalResult] = useState<EvaluationResultResponse | null>(null);
 
   const fetchSubmissions = useCallback(async (projectId?: number) => {
     setLoading(true);
@@ -88,6 +91,21 @@ export default function SubmissionListPage() {
     setSubmissions((prev) =>
       prev.map((s) => (versionKey(s) === key ? selected : s)),
     );
+  };
+
+  const handleRunEval = async (record: SubmissionResponse, method: 'LLM' | 'HYBRID') => {
+    setEvalRunning((prev) => ({ ...prev, [record.id]: true }));
+    try {
+      const result = await runEvaluation(record.id, method, 'INTERNAL');
+      setEvalResult(result);
+      fetchSubmissions(selectedProjectId);
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      message.error(detail ?? `${method} evaluation failed`);
+    } finally {
+      setEvalRunning((prev) => ({ ...prev, [record.id]: false }));
+    }
   };
 
   const columns: ColumnsType<SubmissionResponse> = [
@@ -161,7 +179,7 @@ export default function SubmissionListPage() {
       render: (_, record) =>
         record.latestScore !== null && record.latestLevel !== null ? (
           <span>
-            <strong>{record.latestScore}</strong>/30{' '}
+            <strong>{record.latestScore}</strong>/{record.latestMaxScore ?? 30}{' '}
             <Tag color={getLevelColor(record.latestLevel)}>
               {record.latestLevel}
             </Tag>
@@ -174,11 +192,30 @@ export default function SubmissionListPage() {
       title: 'Actions',
       key: 'actions',
       render: (_, record) => (
-        <Link to={`/submissions/${record.id}`}>
-          <Button type="link" icon={<EyeOutlined />}>
-            View
-          </Button>
-        </Link>
+        <Space>
+          <Link to={`/submissions/${record.id}`}>
+            <Button type="link" icon={<EyeOutlined />}>
+              View
+            </Button>
+          </Link>
+          <Dropdown
+            menu={{
+              items: [
+                { key: 'LLM', label: 'LLM Eval', icon: <RobotOutlined /> },
+                { key: 'HYBRID', label: 'Hybrid Eval', icon: <ExperimentOutlined /> },
+              ],
+              onClick: ({ key }) => handleRunEval(record, key as 'LLM' | 'HYBRID'),
+            }}
+          >
+            <Button
+              type="link"
+              icon={<RobotOutlined />}
+              loading={evalRunning[record.id]}
+            >
+              Evaluate
+            </Button>
+          </Dropdown>
+        </Space>
       ),
     },
   ];
@@ -221,6 +258,62 @@ export default function SubmissionListPage() {
           />
         </Spin>
       </Card>
+
+      <Modal
+        title={
+          <Space>
+            <CheckCircleOutlined style={{ color: '#52c41a' }} />
+            {evalResult?.method === 'HYBRID' ? 'Hybrid' : evalResult?.method === 'RULE_BASED' ? 'Rule-Based' : 'LLM'} Evaluation Complete (Internal)
+          </Space>
+        }
+        open={evalResult !== null}
+        onCancel={() => setEvalResult(null)}
+        footer={[
+          <Button key="close" onClick={() => setEvalResult(null)}>
+            Close
+          </Button>,
+          evalResult && (
+            <Link key="view" to={`/submissions/${evalResult.submissionId}`}>
+              <Button type="primary" icon={<EyeOutlined />}>
+                View Full Details
+              </Button>
+            </Link>
+          ),
+        ]}
+        width={500}
+      >
+        {evalResult && (
+          <div>
+            <ScoreSummary
+              score={evalResult.overallScore}
+              maxScore={evalResult.maxScore}
+              level={evalResult.overallLevel}
+              method={evalResult.method}
+            />
+            <Divider />
+            {evalResult.strengths.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <Typography.Text strong>Strengths:</Typography.Text>
+                <ul style={{ margin: '4px 0', paddingLeft: 20 }}>
+                  {evalResult.strengths.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {evalResult.improvements.length > 0 && (
+              <div>
+                <Typography.Text strong>Improvements:</Typography.Text>
+                <ul style={{ margin: '4px 0', paddingLeft: 20 }}>
+                  {evalResult.improvements.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

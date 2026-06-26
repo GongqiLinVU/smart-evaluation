@@ -17,6 +17,7 @@ public record SubmissionResponse(
         String status,
         Integer latestScore,
         String latestLevel,
+        Integer latestMaxScore,
         Long projectId,
         String projectName,
         Long taskId,
@@ -30,12 +31,14 @@ public record SubmissionResponse(
     public static SubmissionResponse fromEntity(Submission submission, EvaluationResult latestEval, Integer totalVersions) {
         Integer score = null;
         String level = null;
+        Integer maxScore = null;
 
         if (latestEval != null) {
             score = latestEval.getOverallScore();
             level = latestEval.getOverallLevel() != null
                     ? latestEval.getOverallLevel().name()
                     : null;
+            maxScore = latestEval.getMaxScore() != null ? latestEval.getMaxScore() : 30;
         }
 
         return new SubmissionResponse(
@@ -50,6 +53,7 @@ public record SubmissionResponse(
                 submission.getStatus().name(),
                 score,
                 level,
+                maxScore,
                 submission.getProject() != null ? submission.getProject().getId() : null,
                 submission.getProject() != null ? submission.getProject().getName() : null,
                 submission.getTask() != null ? submission.getTask().getId() : null,

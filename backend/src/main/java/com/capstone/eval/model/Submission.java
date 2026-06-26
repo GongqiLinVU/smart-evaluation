@@ -30,6 +30,10 @@ public class Submission {
     @JoinColumn(name = "task_id")
     private ProjectTask task;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id")
+    private Group group;
+
     @Column(nullable = false)
     private String studentName;
 

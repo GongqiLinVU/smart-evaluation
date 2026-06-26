@@ -70,4 +70,17 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
     List<Submission> findLatestPerStudentTaskByProjectIds(List<Long> projectIds);
 
     List<Submission> findByStudentNameAndProjectIdAndTaskIdOrderByVersionDesc(String studentName, Long projectId, Long taskId);
+
+    List<Submission> findByTaskIdOrderByUploadedAtAsc(Long taskId);
+
+    List<Submission> findByTaskId(Long taskId);
+
+    @Query("SELECT COALESCE(MAX(s.version), 0) FROM Submission s WHERE s.group.id = :groupId AND s.task.id = :taskId")
+    int findMaxVersionByGroupIdAndTaskId(Long groupId, Long taskId);
+
+    @Query("SELECT COALESCE(MAX(s.version), 0) FROM Submission s WHERE s.studentName = :studentName AND s.task.id = :taskId")
+    int findMaxVersionByStudentNameAndTaskId(String studentName, Long taskId);
+
+    @Query("SELECT COALESCE(MAX(s.version), 0) FROM Submission s WHERE s.studentName = :studentName AND s.project.id = :projectId AND s.task IS NULL")
+    int findMaxVersionByStudentNameAndProjectIdNoTask(String studentName, Long projectId);
 }

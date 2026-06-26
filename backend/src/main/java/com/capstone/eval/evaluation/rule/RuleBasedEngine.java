@@ -1,9 +1,11 @@
 package com.capstone.eval.evaluation.rule;
 
 import com.capstone.eval.evaluation.EvaluationEngine;
+import com.capstone.eval.evaluation.llm.multiround.DynamicPromptBuilder;
 import com.capstone.eval.model.CriterionScore;
 import com.capstone.eval.model.EvaluationResult;
 import com.capstone.eval.model.RulePackage;
+import com.capstone.eval.model.RulePackageItem;
 import com.capstone.eval.model.Submission;
 import com.capstone.eval.model.enums.EvaluationMethod;
 import com.capstone.eval.model.enums.PerformanceLevel;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -35,7 +38,14 @@ public class RuleBasedEngine implements EvaluationEngine {
     private final LogicExplanationRule logicRule;
     private final MethodologyRule methodologyRule;
     private final ImplementationDetailRule implementationRule;
+    private final MeetingDiaryRule meetingDiaryRule;
+    private final ProgressOrganizationRule progressOrganizationRule;
+    private final CompletionDemoRule completionDemoRule;
+    private final DynamicPromptBuilder dynamicPromptBuilder;
     private final ObjectMapper objectMapper;
+
+    private static final Set<String> PROGRESS_RULE_KEYS = Set.of(
+            "meeting_diary", "progress_organization", "completion_demo");
 
     public EvaluationResult evaluate(ParsedDocument document, Submission submission, RulePackage rulePackage) {
         log.info("Starting rule-based evaluation for submission id={} with rule package '{}'",
@@ -45,6 +55,25 @@ public class RuleBasedEngine implements EvaluationEngine {
         List<Double> weights = new ArrayList<>();
 
         boolean usePackage = rulePackage != null;
+
+        // Run progress report rules from RulePackageItems
+        if (usePackage && rulePackage.getItems() != null) {
+            for (RulePackageItem item : rulePackage.getItems()) {
+                if (!Boolean.TRUE.equals(item.getEnabled())) continue;
+                if (item.getRule() == null) continue;
+                String key = item.getRule().getRuleKey();
+                if (!PROGRESS_RULE_KEYS.contains(key)) continue;
+
+                double weight = item.getWeight() != null ? item.getWeight() : 1.0;
+                CriterionResult result = evaluateProgressRule(key, document);
+                if (result != null) {
+                    results.add(result);
+                    weights.add(weight);
+                }
+            }
+        }
+
+        // Run final report rules (if enabled)
         boolean logicEnabled = !usePackage || Boolean.TRUE.equals(rulePackage.getLogicEnabled());
         boolean methodologyEnabled = !usePackage || Boolean.TRUE.equals(rulePackage.getMethodologyEnabled());
         boolean implementationEnabled = !usePackage || Boolean.TRUE.equals(rulePackage.getImplementationEnabled());
@@ -64,11 +93,22 @@ public class RuleBasedEngine implements EvaluationEngine {
 
         double totalWeight = weights.stream().mapToDouble(Double::doubleValue).sum();
         double overallRawScore = 0;
-        for (int i = 0; i < results.size(); i++) {
-            overallRawScore += results.get(i).getRawScore() * (weights.get(i) / totalWeight);
+        if (totalWeight > 0) {
+            for (int i = 0; i < results.size(); i++) {
+                overallRawScore += results.get(i).getRawScore() * (weights.get(i) / totalWeight);
+            }
         }
 
-        return buildResult(document, submission, results, overallRawScore);
+        return buildResult(document, submission, results, overallRawScore, rulePackage);
+    }
+
+    private CriterionResult evaluateProgressRule(String ruleKey, ParsedDocument document) {
+        return switch (ruleKey) {
+            case "meeting_diary" -> meetingDiaryRule.evaluate(document);
+            case "progress_organization" -> progressOrganizationRule.evaluate(document);
+            case "completion_demo" -> completionDemoRule.evaluate(document);
+            default -> null;
+        };
     }
 
     @Override
@@ -88,17 +128,27 @@ public class RuleBasedEngine implements EvaluationEngine {
                 .average()
                 .orElse(0);
 
-        return buildResult(document, submission, results, overallRawScore);
+        return buildResult(document, submission, results, overallRawScore, null);
     }
 
     private EvaluationResult buildResult(ParsedDocument document, Submission submission,
-                                         List<CriterionResult> results, double overallRawScore) {
+                                         List<CriterionResult> results, double overallRawScore,
+                                         RulePackage rulePackage) {
+        int[] validScores = resolveValidScores(rulePackage);
+        int maxScore = validScores[validScores.length - 1];
+
         PerformanceLevel overallLevel = PerformanceLevel.fromRawScore(overallRawScore);
-        int overallPoints = overallLevel.getPoints();
+        int overallPoints;
+        if (maxScore <= 10) {
+            overallLevel = PerformanceLevel.fromPoints(mapRawToPoints(overallRawScore, validScores), validScores);
+            overallPoints = overallLevel.getPoints();
+        } else {
+            overallPoints = overallLevel.getPoints();
+        }
 
         List<String> strengths = buildStrengths(results);
         List<String> improvements = buildImprovements(results);
-        String overallFeedback = buildOverallFeedback(results, overallRawScore, overallLevel);
+        String overallFeedback = buildOverallFeedback(results, overallRawScore, overallLevel, maxScore);
 
         List<CriterionScore> criterionScores = new ArrayList<>();
 
@@ -106,6 +156,7 @@ public class RuleBasedEngine implements EvaluationEngine {
                 .submission(submission)
                 .method(EvaluationMethod.RULE_BASED)
                 .overallScore(overallPoints)
+                .maxScore(maxScore)
                 .overallLevel(overallLevel)
                 .overallFeedback(overallFeedback)
                 .strengths(toJson(strengths))
@@ -117,11 +168,20 @@ public class RuleBasedEngine implements EvaluationEngine {
                 .build();
 
         for (CriterionResult cr : results) {
+            int criterionPoints;
+            PerformanceLevel criterionLevel;
+            if (maxScore <= 10) {
+                criterionLevel = PerformanceLevel.fromPoints(mapRawToPoints(cr.getRawScore(), validScores), validScores);
+                criterionPoints = criterionLevel.getPoints();
+            } else {
+                criterionLevel = cr.getLevel();
+                criterionPoints = criterionLevel.getPoints();
+            }
             CriterionScore cs = CriterionScore.builder()
                     .evaluationResult(evaluationResult)
                     .criterionName(cr.getCriterionName())
-                    .score(cr.getLevel().getPoints())
-                    .level(cr.getLevel())
+                    .score(criterionPoints)
+                    .level(criterionLevel)
                     .justification(cr.getJustification())
                     .evidence(toJson(cr.getEvidence()))
                     .subScores(toJson(cr.getSubScores()))
@@ -129,10 +189,26 @@ public class RuleBasedEngine implements EvaluationEngine {
             criterionScores.add(cs);
         }
 
-        log.info("Rule-based evaluation complete for submission id={}: overall={}/30 ({})",
-                submission.getId(), overallPoints, overallLevel);
+        log.info("Rule-based evaluation complete for submission id={}: overall={}/{} ({})",
+                submission.getId(), overallPoints, maxScore, overallLevel);
 
         return evaluationResult;
+    }
+
+    private int[] resolveValidScores(RulePackage rulePackage) {
+        if (rulePackage != null) {
+            int[] scores = dynamicPromptBuilder.getValidScores(rulePackage);
+            if (scores.length > 0) return scores;
+        }
+        return new int[]{6, 12, 18, 24, 30};
+    }
+
+    private int mapRawToPoints(double rawScore, int[] validScores) {
+        if (rawScore >= 85) return validScores[validScores.length - 1];
+        if (rawScore >= 65) return validScores[Math.max(0, validScores.length - 2)];
+        if (rawScore >= 45) return validScores[Math.max(0, validScores.length - 3)];
+        if (rawScore >= 25) return validScores[Math.max(0, validScores.length - 4)];
+        return validScores[0];
     }
 
     // -------------------------------------------------------------------
@@ -196,7 +272,7 @@ public class RuleBasedEngine implements EvaluationEngine {
     // -------------------------------------------------------------------
 
     private String buildOverallFeedback(List<CriterionResult> results,
-                                        double overallRaw, PerformanceLevel level) {
+                                        double overallRaw, PerformanceLevel level, int maxScore) {
         StringBuilder sb = new StringBuilder();
         sb.append("Rule-based evaluation completed. ");
 
@@ -207,27 +283,27 @@ public class RuleBasedEngine implements EvaluationEngine {
                     cr.getPoints(), cr.getRawScore()));
         }
 
-        sb.append(String.format("The overall assessment is %s with %d out of 30 points " +
+        sb.append(String.format("The overall assessment is %s with %d out of %d points " +
                         "(mean raw score %.1f/100). ",
-                level.name(), level.getPoints(), overallRaw));
+                level.name(), level.getPoints(), maxScore, overallRaw));
 
         // Tailored closing advice based on level
         switch (level) {
-            case EXCELLENT:
+            case EXCELLENT: case HD:
                 sb.append("The report demonstrates strong technical writing across all criteria.");
                 break;
-            case PROFICIENT:
+            case PROFICIENT: case D:
                 sb.append("The report is solid but could benefit from deeper evidence in weaker areas.");
                 break;
-            case COMPETENT:
+            case COMPETENT: case C:
                 sb.append("The report covers the basics but lacks depth in several areas. " +
                         "Adding more code examples, diagrams, and justification would strengthen it.");
                 break;
-            case DEVELOPING:
+            case DEVELOPING: case P:
                 sb.append("The report requires substantial improvement. Focus on adding " +
                         "implementation details, methodology description, and design rationale.");
                 break;
-            case INADEQUATE:
+            case INADEQUATE: case F:
                 sb.append("The report is significantly below expectations. Most sections need " +
                         "to be expanded with concrete technical content.");
                 break;

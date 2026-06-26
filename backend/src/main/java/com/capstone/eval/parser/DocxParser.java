@@ -2,6 +2,10 @@ package com.capstone.eval.parser;
 
 import com.capstone.eval.exception.DocumentParseException;
 import org.apache.poi.xwpf.usermodel.*;
+import org.openxmlformats.schemas.drawingml.x2006.wordprocessingDrawing.CTInline;
+import org.openxmlformats.schemas.drawingml.x2006.wordprocessingDrawing.CTAnchor;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTDrawing;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTR;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
@@ -100,6 +104,8 @@ public class DocxParser {
             StringBuilder currentCodeBlock = new StringBuilder();
             boolean inCodeBlock = false;
 
+            List<String> sectionImageDescs = new ArrayList<>();
+
             for (int i = startIdx; i < endIdx; i++) {
                 XWPFParagraph p = paragraphs.get(i);
                 String text = p.getText().trim();
@@ -107,6 +113,8 @@ public class DocxParser {
                 // Image detection via CTP XML markers
                 if (containsImage(p)) {
                     sectionImages++;
+                    List<String> descs = extractImageDescriptions(p);
+                    sectionImageDescs.addAll(descs);
                 }
 
                 boolean isCode = isCodeParagraph(p);
@@ -146,7 +154,9 @@ public class DocxParser {
                     .wordCount(wordCount)
                     .codeSnippets(codeSnippets)
                     .imageCount(sectionImages)
+                    .imageDescriptions(sectionImageDescs)
                     .tableCount(0) // tables are counted globally below and attributed after
+                    .tableContents(new ArrayList<>()) // populated by attributeTableCounts
                     .technicalTerms(techTerms)
                     .technicalVocabularyDensity(Math.round(density * 10000.0) / 10000.0)
                     .build());
@@ -338,6 +348,59 @@ public class DocxParser {
         return xml.contains("wp:inline") || xml.contains("wp:anchor");
     }
 
+    /**
+     * Extract alt-text, title, and description from images embedded in a paragraph.
+     * This provides the LLM with context about what images show without needing vision.
+     */
+    private List<String> extractImageDescriptions(XWPFParagraph paragraph) {
+        List<String> descriptions = new ArrayList<>();
+        try {
+            for (XWPFRun run : paragraph.getRuns()) {
+                CTR ctr = run.getCTR();
+                if (ctr == null) continue;
+                for (CTDrawing drawing : ctr.getDrawingList()) {
+                    // Inline images
+                    for (CTInline inline : drawing.getInlineList()) {
+                        String desc = buildImageDescription(
+                                inline.getDocPr() != null ? inline.getDocPr().getName() : null,
+                                inline.getDocPr() != null ? inline.getDocPr().getTitle() : null,
+                                inline.getDocPr() != null ? inline.getDocPr().getDescr() : null
+                        );
+                        if (desc != null) descriptions.add(desc);
+                    }
+                    // Anchored images
+                    for (CTAnchor anchor : drawing.getAnchorList()) {
+                        String desc = buildImageDescription(
+                                anchor.getDocPr() != null ? anchor.getDocPr().getName() : null,
+                                anchor.getDocPr() != null ? anchor.getDocPr().getTitle() : null,
+                                anchor.getDocPr() != null ? anchor.getDocPr().getDescr() : null
+                        );
+                        if (desc != null) descriptions.add(desc);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Graceful fallback — don't fail parsing if image metadata extraction fails
+        }
+        return descriptions;
+    }
+
+    private String buildImageDescription(String name, String title, String descr) {
+        StringBuilder sb = new StringBuilder();
+        if (title != null && !title.isBlank()) {
+            sb.append(title);
+        }
+        if (descr != null && !descr.isBlank()) {
+            if (sb.length() > 0) sb.append(" — ");
+            sb.append(descr);
+        }
+        if (sb.length() == 0 && name != null && !name.isBlank()
+                && !name.startsWith("Picture ") && !name.startsWith("Image ")) {
+            sb.append(name);
+        }
+        return sb.length() > 0 ? sb.toString() : null;
+    }
+
     // -------------------------------------------------------- link extraction
 
     /**
@@ -360,7 +423,7 @@ public class DocxParser {
     // --------------------------------------------------- table attribution
 
     /**
-     * Attribute table counts to sections based on body element ordering.
+     * Attribute table counts and content to sections based on body element ordering.
      * Tables that appear between two headings belong to the section started by the first heading.
      */
     private void attributeTableCounts(XWPFDocument document,
@@ -372,14 +435,11 @@ public class DocxParser {
 
         List<IBodyElement> bodyElements = document.getBodyElements();
 
-        // Map paragraph index -> section index
-        // We walk body elements and track which section we are in
         int currentSection = -1;
         int paragraphIndex = 0;
 
         for (IBodyElement element : bodyElements) {
             if (element instanceof XWPFParagraph) {
-                // Check if this paragraph starts a new section
                 for (int b = 0; b < boundaries.size(); b++) {
                     if (boundaries.get(b).paragraphIndex == paragraphIndex) {
                         currentSection = b;
@@ -387,13 +447,49 @@ public class DocxParser {
                     }
                 }
                 paragraphIndex++;
-            } else if (element instanceof XWPFTable) {
+            } else if (element instanceof XWPFTable table) {
                 if (currentSection >= 0 && currentSection < sections.size()) {
                     DocumentSection sec = sections.get(currentSection);
                     sec.setTableCount(sec.getTableCount() + 1);
+                    String tableText = extractTableContent(table);
+                    if (!tableText.isBlank()) {
+                        sec.getTableContents().add(tableText);
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * Extract table content as a markdown-style text representation.
+     * Limits to first 20 rows to avoid oversized content.
+     */
+    private String extractTableContent(XWPFTable table) {
+        List<XWPFTableRow> rows = table.getRows();
+        if (rows.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder();
+        int maxRows = Math.min(rows.size(), 20);
+
+        for (int r = 0; r < maxRows; r++) {
+            XWPFTableRow row = rows.get(r);
+            List<String> cells = new ArrayList<>();
+            for (XWPFTableCell cell : row.getTableCells()) {
+                String cellText = cell.getText().replace("\n", " ").replace("\t", " ").trim();
+                if (cellText.length() > 100) {
+                    cellText = cellText.substring(0, 100) + "...";
+                }
+                cells.add(cellText);
+            }
+            sb.append("| ").append(String.join(" | ", cells)).append(" |\n");
+            if (r == 0) {
+                sb.append("|").append(" --- |".repeat(cells.size())).append("\n");
+            }
+        }
+        if (rows.size() > maxRows) {
+            sb.append(String.format("| ... (%d more rows) |\n", rows.size() - maxRows));
+        }
+        return sb.toString().trim();
     }
 
     // -------------------------------------------------------- word counting

@@ -3,6 +3,7 @@ package com.capstone.eval.controller;
 import com.capstone.eval.dto.*;
 import com.capstone.eval.model.EvaluationResult;
 import com.capstone.eval.model.Submission;
+import com.capstone.eval.model.enums.EvaluationVisibility;
 import com.capstone.eval.repository.EvaluationResultRepository;
 import com.capstone.eval.repository.ParsedDocumentRepository;
 import com.capstone.eval.security.AuthPrincipal;
@@ -28,6 +29,7 @@ public class SubmissionController {
     private final SubmissionService submissionService;
     private final EvaluationResultRepository evaluationResultRepository;
     private final ParsedDocumentRepository parsedDocumentRepository;
+    private final com.capstone.eval.repository.SubmissionRepository submissionRepository;
     private final ObjectMapper objectMapper;
     private final com.capstone.eval.service.ProjectService projectService;
 
@@ -100,10 +102,14 @@ public class SubmissionController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SubmissionDetailResponse> detail(@PathVariable Long id) {
+    public ResponseEntity<SubmissionDetailResponse> detail(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AuthPrincipal principal) {
         Submission submission = submissionService.getSubmission(id);
 
-        EvaluationResult latestEval = findLatestEvaluation(id);
+        boolean isPrivileged = "ADMIN".equals(principal.role()) || "TUTOR".equals(principal.role());
+
+        EvaluationResult latestEval = findLatestEvaluation(id, isPrivileged);
         SubmissionResponse submissionResponse = SubmissionResponse.fromEntity(submission, latestEval);
 
         DocumentStatsResponse documentStats = parsedDocumentRepository.findBySubmissionId(id)
@@ -113,6 +119,7 @@ public class SubmissionController {
         List<EvaluationResultResponse> evaluations = evaluationResultRepository
                 .findBySubmissionId(id)
                 .stream()
+                .filter(er -> isPrivileged || er.getVisibility() != EvaluationVisibility.INTERNAL)
                 .map(er -> EvaluationResultResponse.fromEntity(er, objectMapper))
                 .collect(Collectors.toList());
 
@@ -144,17 +151,35 @@ public class SubmissionController {
         return submissions.stream()
                 .map(sub -> {
                     EvaluationResult latestEval = findLatestEvaluation(sub.getId());
-                    return SubmissionResponse.fromEntity(sub, latestEval);
+                    int totalVersions = computeTotalVersions(sub);
+                    return SubmissionResponse.fromEntity(sub, latestEval, totalVersions);
                 })
                 .collect(Collectors.toList());
     }
 
+    private int computeTotalVersions(Submission sub) {
+        if (sub.getTask() != null) {
+            return submissionRepository.findMaxVersionByStudentNameAndTaskId(
+                    sub.getStudentName(), sub.getTask().getId());
+        }
+        if (sub.getProject() != null) {
+            return submissionRepository.findMaxVersionByStudentNameAndProjectIdNoTask(
+                    sub.getStudentName(), sub.getProject().getId());
+        }
+        return sub.getVersion();
+    }
+
     private EvaluationResult findLatestEvaluation(Long submissionId) {
+        return findLatestEvaluation(submissionId, true);
+    }
+
+    private EvaluationResult findLatestEvaluation(Long submissionId, boolean includeInternal) {
         List<EvaluationResult> evaluations = evaluationResultRepository.findBySubmissionId(submissionId);
         if (evaluations.isEmpty()) {
             return null;
         }
         return evaluations.stream()
+                .filter(er -> includeInternal || er.getVisibility() != EvaluationVisibility.INTERNAL)
                 .max(Comparator.comparing(EvaluationResult::getEvaluatedAt,
                         Comparator.nullsFirst(Comparator.naturalOrder())))
                 .orElse(null);
